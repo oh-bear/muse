@@ -27,10 +27,10 @@ def run_migrations_online() -> None:
     connectable = create_engine(db_url, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         connection.execute(text("CREATE SCHEMA IF NOT EXISTS muse"))
+        connection.commit()
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            version_table_schema="muse",
             include_schemas=True,
         )
         with context.begin_transaction():

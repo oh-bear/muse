@@ -29,7 +29,7 @@ services:
       ADMIN_USERNAME: ${MINIFLUX_ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${MINIFLUX_ADMIN_PASSWORD:-admin123}
     ports:
-      - "8080:8080"
+      - "${MINIFLUX_PORT:-8080}:8080"
 
   worker:
     build: .
