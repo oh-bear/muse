@@ -1,0 +1,28 @@
+focus_areas:
+  - ai-tools
+  - developer-tools
+  - productivity
+  - saas
+  - creator-economy
+
+exclude:
+  - crypto
+  - web3
+  - gambling
+  - adult
+
+score_threshold: 3
+
+languages:
+  - en
+  - zh
+
+source_mapping:
+  "Product Hunt - Today": producthunt
+  "Hacker News - Best": hackernews
+  "Indie Hackers - Feed": indiehackers
+
+indie_criteria:
+  max_team_size: 5
+  prefer_low_infra: true
+  prefer_digital_product: true

@@ -36,5 +36,5 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-[tool.poetry.packages]
-include = [{include = "muse", from = "src"}]
+[tool.poetry]
+packages = [{include = "muse", from = "src"}]
