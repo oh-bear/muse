@@ -90,7 +90,9 @@ async def collect_signals_job(
         if settings.ai_provider == "claude"
         else settings.openai_api_key
     )
-    ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
+    ai_client = AIClient(
+        provider=settings.ai_provider, api_key=api_key, base_url=settings.openai_base_url
+    )
     detector = SignalDetector(
         ai_client=ai_client,
         system_prompt_path=str(PROMPTS_DIR / "signal_detection_system.txt"),
@@ -201,7 +203,9 @@ async def extract_opportunities_job(
         if settings.ai_provider == "claude"
         else settings.openai_api_key
     )
-    ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
+    ai_client = AIClient(
+        provider=settings.ai_provider, api_key=api_key, base_url=settings.openai_base_url
+    )
     extractor = OpportunityExtractor(
         ai_client=ai_client,
         system_prompt_path=str(PROMPTS_DIR / "opportunity_extraction_system.txt"),
@@ -331,7 +335,9 @@ async def generate_ideas_job(
         if settings.ai_provider == "claude"
         else settings.openai_api_key
     )
-    ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
+    ai_client = AIClient(
+        provider=settings.ai_provider, api_key=api_key, base_url=settings.openai_base_url
+    )
     generator = IdeaGenerator(
         ai_client=ai_client,
         system_prompt_path=str(PROMPTS_DIR / "idea_generation_system.txt"),

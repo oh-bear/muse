@@ -11,7 +11,7 @@ import structlog
 logger = structlog.get_logger()
 
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
 class AIRequestError(Exception):
@@ -23,6 +23,7 @@ class AIClient:
     provider: str  # "claude" | "openai"
     api_key: str
     model: str = ""
+    base_url: str = ""
     max_retries: int = 3
     base_delay: float = 2.0
 
@@ -109,9 +110,14 @@ class AIClient:
     async def _call_openai(
         self, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict]:
+        url = (
+            f"{self.base_url.rstrip('/')}/chat/completions"
+            if self.base_url
+            else f"{DEFAULT_OPENAI_BASE_URL}/chat/completions"
+        )
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
-                OPENAI_API_URL,
+                url,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",

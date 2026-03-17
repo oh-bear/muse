@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     ai_provider: str = "claude"  # claude | openai
     anthropic_api_key: str = ""
     openai_api_key: str = ""
+    openai_base_url: str = ""  # custom endpoint for DeepSeek, Ollama, etc.
 
     # Telegram
     telegram_bot_token: str
