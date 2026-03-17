@@ -13,7 +13,7 @@ from testcontainers.postgres import PostgresContainer
 from sqlalchemy import select, text
 
 from muse.config import FocusConfig, Settings
-from muse.db import Base, Signal, State, make_engine, make_session_factory
+from muse.db import Base, Opportunity, Signal, State, make_engine, make_session_factory
 
 
 @pytest.fixture(scope="module")
@@ -49,6 +49,11 @@ def settings(db):
         anthropic_api_key="sk-test",
         telegram_bot_token="123:abc",
         telegram_chat_id="-100test",
+        smtp_host="smtp.test.com",
+        smtp_port=587,
+        smtp_user="bot@test.com",
+        smtp_password="secret",
+        email_recipients="user@test.com",
     )
 
 
@@ -123,3 +128,69 @@ async def test_full_pipeline(settings, focus, db):
 
     # Verify: Telegram push called
     bot_instance.send_message.assert_called_once()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_opportunity_pipeline(settings, focus, db):
+    """Signals → opportunity extraction → store → push."""
+    _, _, session_factory = db
+
+    # Seed some signals from the "past week"
+    async with session_factory() as session:
+        for i in range(1, 4):
+            session.add(Signal(
+                miniflux_entry_id=100 + i,
+                title=f"AI Tool {i}",
+                url=f"https://x.com/{i}",
+                source="producthunt",
+                raw_summary=f"Description {i}",
+                ai_summary=f"AI tool summary {i}",
+                ai_tags=["ai-tool"],
+                ai_score=4,
+                ai_reason="Strong signal",
+            ))
+        await session.commit()
+
+    # Mock Claude API for opportunity extraction
+    ai_result = json.dumps({
+        "opportunities": [
+            {
+                "title": "AI Dev Tools Gap",
+                "description": "3 signals show unmet need",
+                "trend_category": "developer-tools",
+                "unmet_need": "Logic review automation",
+                "market_gap": "No indie solution",
+                "geo_opportunity": "",
+                "evidence_ids": [],
+                "confidence": "high",
+            }
+        ],
+        "weekly_summary": "AI dominated this week.",
+    })
+    respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(200, json={
+            "content": [{"type": "text", "text": ai_result}],
+            "usage": {"input_tokens": 500, "output_tokens": 200},
+        })
+    )
+
+    # Mock Telegram + Email
+    bot_instance = AsyncMock()
+    bot_instance.send_message = AsyncMock()
+    bot_instance.__aenter__ = AsyncMock(return_value=bot_instance)
+    bot_instance.__aexit__ = AsyncMock(return_value=False)
+
+    from muse.scheduler import extract_opportunities_job
+
+    with patch("muse.publisher.telegram.Bot", return_value=bot_instance), \
+         patch("muse.publisher.email.aiosmtplib") as mock_smtp:
+        mock_smtp.send = AsyncMock()
+        await extract_opportunities_job(settings, focus, session_factory)
+
+    # Verify: opportunity stored
+    async with session_factory() as session:
+        opps = (await session.execute(select(Opportunity))).scalars().all()
+        assert len(opps) == 1
+        assert opps[0].title == "AI Dev Tools Gap"
+        assert opps[0].trend_category == "developer-tools"

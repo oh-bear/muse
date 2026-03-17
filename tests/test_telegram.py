@@ -49,6 +49,41 @@ async def test_send_alert(publisher, mock_bot):
 
 
 @pytest.mark.asyncio
+async def test_send_weekly_brief(publisher, mock_bot):
+    opportunities = [
+        {
+            "title": "AI Code Review Gap",
+            "description": "Multiple signals show demand",
+            "trend_category": "developer-tools",
+            "unmet_need": "Automated logic review",
+            "market_gap": "No indie solution",
+            "confidence": "high",
+        },
+        {
+            "title": "SEA SaaS Localization",
+            "description": "EN tools missing in SEA",
+            "trend_category": "saas",
+            "unmet_need": "Local payment integration",
+            "market_gap": "No localized version",
+            "confidence": "medium",
+        },
+    ]
+
+    await publisher.send_weekly_brief(
+        opportunities=opportunities,
+        weekly_summary="AI tools and localization dominated this week.",
+        signal_count=35,
+        week_label="2026-W12",
+    )
+
+    mock_bot.send_message.assert_called_once()
+    message = mock_bot.send_message.call_args[1]["text"]
+    assert "2026-W12" in message
+    assert "AI Code Review Gap" in message
+    assert "35" in message
+
+
+@pytest.mark.asyncio
 async def test_send_daily_summary_empty_signals(publisher, mock_bot):
     await publisher.send_daily_summary([], total_processed=50)
 

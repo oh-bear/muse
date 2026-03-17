@@ -30,6 +30,22 @@ class Settings(BaseSettings):
     schedule_hour: int = 8
     schedule_minute: int = 0
 
+    # Email
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_recipients: str = ""  # comma-separated
+
+    # Notion
+    notion_api_key: str = ""
+    notion_ideas_database_id: str = ""
+
+    # Weekly schedule (Monday)
+    weekly_schedule_day: str = "mon"
+    weekly_schedule_hour: int = 10
+    weekly_schedule_minute: int = 0
+
     class Config:
         env_file = ".env"
 

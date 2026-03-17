@@ -39,6 +39,39 @@ class TelegramPublisher:
         await self._send(message)
         logger.info("telegram_daily_sent", signals=len(signals))
 
+    async def send_weekly_brief(
+        self,
+        opportunities: list[dict[str, Any]],
+        weekly_summary: str,
+        signal_count: int,
+        week_label: str,
+    ) -> None:
+        lines = [
+            "🎯 *Muse Weekly Insights*",
+            f"_{week_label} · {signal_count} signals analyzed_",
+        ]
+
+        if weekly_summary:
+            lines.append("")
+            lines.append(weekly_summary)
+
+        if opportunities:
+            lines.append("")
+            for i, opp in enumerate(opportunities, 1):
+                conf = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(
+                    opp.get("confidence", ""), "⚪"
+                )
+                lines.append(f"{i}\\. *{opp['title']}* {conf}")
+                lines.append(f"   {opp.get('description', '')}")
+                lines.append("")
+        else:
+            lines.append("")
+            lines.append("No significant opportunities this week\\.")
+
+        message = "\n".join(lines)
+        await self._send(message)
+        logger.info("telegram_weekly_sent", opportunities=len(opportunities))
+
     async def send_alert(self, message: str) -> None:
         text = f"🚨 *Muse Alert*\n\n{message}"
         await self._send(text)

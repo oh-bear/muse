@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     BigInteger,
+    Date,
     DateTime,
     SmallInteger,
     String,
@@ -53,6 +54,27 @@ class State(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class Opportunity(Base):
+    __tablename__ = "opportunities"
+    __table_args__ = {"schema": "muse"}
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    title: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    trend_category: Mapped[str] = mapped_column(String(64))
+    unmet_need: Mapped[str] = mapped_column(Text)
+    market_gap: Mapped[str] = mapped_column(Text)
+    geo_opportunity: Mapped[str] = mapped_column(Text, default="")
+    signal_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
+    week_of: Mapped[date] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
     )
 
 
