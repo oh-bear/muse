@@ -7,17 +7,19 @@ from typing import Any
 
 import httpx
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from muse.analyzer.ai_client import AIClient
+from muse.analyzer.idea import IdeaGenerator
 from muse.analyzer.signal import SignalDetector
 from muse.collector.filter import pre_filter
 from muse.collector.miniflux import MinifluxCollector
 from muse.config import FocusConfig, Settings
 from muse.analyzer.opportunity import OpportunityExtractor
-from muse.db import Opportunity, Signal, State
+from muse.db import Idea, Opportunity, Signal, State, VALID_IDEA_STATUSES
 from muse.publisher.email import EmailPublisher
+from muse.publisher.notion import NotionPublisher
 from muse.publisher.telegram import TelegramPublisher
 
 logger = structlog.get_logger()
@@ -251,3 +253,162 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
 
     logger.info("job_completed", job="extract_opportunities", job_id=job_id,
                signals=len(db_signals), opportunities=len(extraction.opportunities))
+
+
+async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_factory) -> None:
+    """Monthly job: query month's opportunities → AI idea generation → store → push."""
+    job_id = str(uuid.uuid4())[:8]
+    logger.info("job_started", job="generate_ideas", job_id=job_id)
+
+    telegram = TelegramPublisher(
+        bot_token=settings.telegram_bot_token,
+        chat_id=settings.telegram_chat_id,
+    )
+
+    # 1. Query opportunities from the past 30 days
+    one_month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    async with session_factory() as session:
+        result = await session.execute(
+            select(Opportunity).where(Opportunity.created_at >= one_month_ago)
+        )
+        db_opps = result.scalars().all()
+
+    if not db_opps:
+        logger.info("no_opportunities_for_ideas", job_id=job_id)
+        return
+
+    # 2. Convert to dicts for AI
+    opps_data = [
+        {
+            "id": str(o.id),
+            "title": o.title,
+            "description": o.description,
+            "trend_category": o.trend_category,
+            "unmet_need": o.unmet_need,
+            "market_gap": o.market_gap,
+            "geo_opportunity": o.geo_opportunity,
+            "confidence": o.confidence,
+        }
+        for o in db_opps
+    ]
+
+    # 3. Run IdeaGenerator
+    api_key = settings.anthropic_api_key if settings.ai_provider == "claude" else settings.openai_api_key
+    ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
+    generator = IdeaGenerator(
+        ai_client=ai_client,
+        system_prompt_path=str(PROMPTS_DIR / "idea_generation_system.txt"),
+        user_prompt_path=str(PROMPTS_DIR / "idea_generation_user.txt"),
+        focus_areas=focus.focus_areas,
+        indie_criteria=focus.indie_criteria,
+    )
+    generation = await generator.generate(opps_data)
+
+    if generation.failed and not generation.ideas:
+        await telegram.send_alert(f"Idea generation failed: {generation.error}")
+        return
+
+    # 4. Store ideas
+    opp_id_map = {str(o.id): o.id for o in db_opps}
+    async with session_factory() as session:
+        for idea in generation.ideas:
+            opp_id = opp_id_map.get(idea.get("source_opportunity_id"))
+            session.add(Idea(
+                title=idea["title"],
+                one_liner=idea.get("one_liner", ""),
+                target_users=idea.get("target_users", ""),
+                pain_point=idea.get("pain_point", ""),
+                differentiation=idea.get("differentiation", ""),
+                channels=idea.get("channels", []),
+                revenue_model=idea.get("revenue_model", ""),
+                key_resources=idea.get("key_resources", ""),
+                cost_estimate=idea.get("cost_estimate", ""),
+                validation_method=idea.get("validation_method", ""),
+                difficulty=idea.get("difficulty", 3),
+                opportunity_id=opp_id,
+            ))
+        await session.commit()
+
+    # 5. Calculate month label
+    month_label = datetime.now(timezone.utc).strftime("%Y-%m")
+
+    # 6. Push via Telegram
+    try:
+        await telegram.send_monthly_ideas(
+            ideas=generation.ideas,
+            monthly_summary=generation.monthly_summary,
+            opportunity_count=len(db_opps),
+            month_label=month_label,
+        )
+    except Exception as e:
+        logger.error("telegram_monthly_failed", error=str(e))
+
+    # 7. Push via Email
+    email = EmailPublisher(
+        smtp_host=settings.smtp_host,
+        smtp_port=settings.smtp_port,
+        smtp_user=settings.smtp_user,
+        smtp_password=settings.smtp_password,
+        recipients=[r.strip() for r in settings.email_recipients.split(",") if r.strip()],
+    )
+    try:
+        await email.send_monthly_ideas(
+            ideas=generation.ideas,
+            monthly_summary=generation.monthly_summary,
+            opportunity_count=len(db_opps),
+            month_label=month_label,
+        )
+    except Exception as e:
+        logger.error("email_monthly_failed", error=str(e))
+
+    logger.info("job_completed", job="generate_ideas", job_id=job_id,
+               opportunities=len(db_opps), ideas=len(generation.ideas))
+
+
+async def notion_sync_job(settings: Settings, session_factory) -> None:
+    """Sync ideas with Notion — push new, pull status updates."""
+    job_id = str(uuid.uuid4())[:8]
+    logger.info("job_started", job="notion_sync", job_id=job_id)
+
+    notion = NotionPublisher(
+        api_key=settings.notion_api_key,
+        ideas_database_id=settings.notion_ideas_database_id,
+    )
+    if not notion.is_configured():
+        logger.info("notion_sync_skipped", reason="not configured")
+        return
+
+    # Push: new ideas → Notion
+    async with session_factory() as session:
+        result = await session.execute(
+            select(Idea).where(Idea.notion_page_id.is_(None))
+        )
+        new_ideas = result.scalars().all()
+
+    if new_ideas:
+        pushed = await notion.push_ideas(new_ideas)
+        async with session_factory() as session:
+            for idea_id, page_id in pushed:
+                await session.execute(
+                    update(Idea).where(Idea.id == idea_id).values(notion_page_id=page_id)
+                )
+            await session.commit()
+        logger.info("notion_pushed", count=len(pushed))
+
+    # Pull: updated statuses from Notion → DB
+    updates = await notion.pull_status_updates()
+    if updates:
+        async with session_factory() as session:
+            for page_id, new_status, edited_time in updates:
+                if new_status not in VALID_IDEA_STATUSES:
+                    logger.warning("notion_invalid_status", page_id=page_id, status=new_status)
+                    continue
+                await session.execute(
+                    update(Idea)
+                    .where(Idea.notion_page_id == page_id, Idea.updated_at < edited_time)
+                    .values(status=new_status, updated_at=edited_time)
+                )
+            await session.commit()
+        logger.info("notion_pulled", count=len(updates))
+
+    logger.info("job_completed", job="notion_sync", job_id=job_id)
