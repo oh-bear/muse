@@ -11,9 +11,10 @@ from unittest.mock import AsyncMock, patch
 from testcontainers.postgres import PostgresContainer
 
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from muse.config import FocusConfig, Settings
-from muse.db import Base, Opportunity, Signal, State, make_engine, make_session_factory
+from muse.db import Base, Idea, Opportunity, Signal, State, make_engine, make_session_factory
 
 
 @pytest.fixture(scope="module")
@@ -30,9 +31,11 @@ async def db(postgres):
         await conn.execute(text("CREATE SCHEMA IF NOT EXISTS muse"))
         await conn.run_sync(Base.metadata.create_all)
     session_factory = make_session_factory(engine)
-    # Seed initial state
+    # Seed initial state (idempotent)
     async with session_factory() as session:
-        session.add(State(key="last_processed_entry_id", value="0"))
+        stmt = pg_insert(State).values(key="last_processed_entry_id", value="0")
+        stmt = stmt.on_conflict_do_nothing(index_elements=["key"])
+        await session.execute(stmt)
         await session.commit()
     yield url, engine, session_factory
     await engine.dispose()
@@ -194,3 +197,85 @@ async def test_opportunity_pipeline(settings, focus, db):
         assert len(opps) == 1
         assert opps[0].title == "AI Dev Tools Gap"
         assert opps[0].trend_category == "developer-tools"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_idea_pipeline(settings, focus, db):
+    """Opportunities → idea generation → store → push."""
+    _, _, session_factory = db
+
+    # Seed an opportunity (from previous test or fresh)
+    async with session_factory() as session:
+        existing = (await session.execute(select(Opportunity))).scalars().all()
+        if not existing:
+            session.add(Opportunity(
+                title="AI Dev Tools Gap",
+                description="3 signals show unmet need",
+                trend_category="developer-tools",
+                unmet_need="Logic review automation",
+                market_gap="No indie solution",
+                geo_opportunity="",
+                confidence="high",
+                signal_ids=[],
+            ))
+            await session.commit()
+
+    # Get opportunity ID for AI response
+    async with session_factory() as session:
+        opps = (await session.execute(select(Opportunity))).scalars().all()
+        opp_id = str(opps[0].id)
+
+    # Mock Claude API for idea generation
+    ai_result = json.dumps({
+        "ideas": [
+            {
+                "title": "CodeReview.ai",
+                "one_liner": "AI code review for PRs",
+                "target_users": "Small dev teams",
+                "pain_point": "Slow code review",
+                "differentiation": "Logic errors, not style",
+                "channels": ["GitHub Marketplace"],
+                "revenue_model": "freemium",
+                "key_resources": "AI expertise",
+                "cost_estimate": "Low",
+                "validation_method": "GitHub Action MVP",
+                "difficulty": 3,
+                "source_opportunity_id": opp_id,
+            }
+        ],
+        "monthly_summary": "AI dev tools dominated this month.",
+    })
+    respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(200, json={
+            "content": [{"type": "text", "text": ai_result}],
+            "usage": {"input_tokens": 800, "output_tokens": 400},
+        })
+    )
+
+    # Mock Telegram + Email
+    bot_instance = AsyncMock()
+    bot_instance.send_message = AsyncMock()
+    bot_instance.__aenter__ = AsyncMock(return_value=bot_instance)
+    bot_instance.__aexit__ = AsyncMock(return_value=False)
+
+    from muse.scheduler import generate_ideas_job
+
+    with patch("muse.publisher.telegram.Bot", return_value=bot_instance), \
+         patch("muse.publisher.email.aiosmtplib") as mock_smtp:
+        mock_smtp.send = AsyncMock()
+        await generate_ideas_job(settings, focus, session_factory)
+
+    # Verify: idea stored with correct FK
+    async with session_factory() as session:
+        ideas = (await session.execute(select(Idea))).scalars().all()
+        assert len(ideas) >= 1
+        idea = next(i for i in ideas if i.title == "CodeReview.ai")
+        assert idea.one_liner == "AI code review for PRs"
+        assert idea.revenue_model == "freemium"
+        assert idea.difficulty == 3
+        assert str(idea.opportunity_id) == opp_id
+        assert idea.status == "pending"
+
+    # Verify: Telegram push called
+    bot_instance.send_message.assert_called()
