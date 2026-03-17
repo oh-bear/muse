@@ -52,6 +52,7 @@ async def collect_signals_job(settings: Settings, focus: FocusConfig, session_fa
     telegram = TelegramPublisher(
         bot_token=settings.telegram_bot_token,
         chat_id=settings.telegram_chat_id,
+        topic_id=settings.telegram_topic_id or None,
     )
 
     # 1. Read watermark
@@ -151,6 +152,7 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
     telegram = TelegramPublisher(
         bot_token=settings.telegram_bot_token,
         chat_id=settings.telegram_chat_id,
+        topic_id=settings.telegram_topic_id or None,
     )
 
     # 1. Query signals from the past 7 days
@@ -263,6 +265,7 @@ async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_fac
     telegram = TelegramPublisher(
         bot_token=settings.telegram_bot_token,
         chat_id=settings.telegram_chat_id,
+        topic_id=settings.telegram_topic_id or None,
     )
 
     # 1. Query opportunities from the past 30 days

@@ -13,6 +13,7 @@ logger = structlog.get_logger()
 class TelegramPublisher:
     bot_token: str
     chat_id: str
+    topic_id: int | None = None
 
     async def send_daily_summary(self, signals: list[dict[str, Any]], total_processed: int) -> None:
         top_signals = sorted(signals, key=lambda s: s.get("score", 0), reverse=True)[:3]
@@ -112,8 +113,11 @@ class TelegramPublisher:
 
     async def _send(self, text: str) -> None:
         async with Bot(token=self.bot_token) as bot:
-            await bot.send_message(
-                chat_id=self.chat_id,
-                text=text,
-                parse_mode="Markdown",
-            )
+            kwargs: dict[str, Any] = {
+                "chat_id": self.chat_id,
+                "text": text,
+                "parse_mode": "Markdown",
+            }
+            if self.topic_id:
+                kwargs["message_thread_id"] = self.topic_id
+            await bot.send_message(**kwargs)

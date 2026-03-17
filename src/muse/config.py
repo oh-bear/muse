@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str
     telegram_chat_id: str
+    telegram_topic_id: int = 0  # message_thread_id for topic groups, 0 = disabled
 
     # Scheduler (configurable schedule times)
     timezone: str = "Asia/Singapore"
