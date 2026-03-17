@@ -1,0 +1,5 @@
+Here are the product opportunities identified this month. Generate 1-2 concrete product ideas for each opportunity.
+
+## Opportunities
+
+$opportunities
