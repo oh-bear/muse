@@ -47,7 +47,9 @@ class EmailPublisher:
         msg["Subject"] = f"Muse Weekly Insights — {week_label}"
         msg["From"] = self.smtp_user
         msg["To"] = ", ".join(self.recipients)
-        msg.set_content(f"Muse Weekly: {len(opportunities)} opportunities from {signal_count} signals.")
+        msg.set_content(
+            f"Muse Weekly: {len(opportunities)} opportunities from {signal_count} signals."
+        )
         msg.add_alternative(html, subtype="html")
 
         await aiosmtplib.send(
@@ -59,7 +61,11 @@ class EmailPublisher:
             start_tls=True,
         )
 
-        logger.info("email_weekly_sent", recipients=len(self.recipients), opportunities=len(opportunities))
+        logger.info(
+            "email_weekly_sent",
+            recipients=len(self.recipients),
+            opportunities=len(opportunities),
+        )
 
     async def send_monthly_ideas(
         self,
@@ -86,7 +92,9 @@ class EmailPublisher:
         msg["Subject"] = f"Muse Monthly Ideas — {month_label}"
         msg["From"] = self.smtp_user
         msg["To"] = ", ".join(self.recipients)
-        msg.set_content(f"Muse Monthly: {len(ideas)} ideas from {opportunity_count} opportunities.")
+        msg.set_content(
+            f"Muse Monthly: {len(ideas)} ideas from {opportunity_count} opportunities."
+        )
         msg.add_alternative(html, subtype="html")
 
         await aiosmtplib.send(
@@ -98,4 +106,6 @@ class EmailPublisher:
             start_tls=True,
         )
 
-        logger.info("email_monthly_sent", recipients=len(self.recipients), ideas=len(ideas))
+        logger.info(
+            "email_monthly_sent", recipients=len(self.recipients), ideas=len(ideas)
+        )

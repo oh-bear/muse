@@ -2,19 +2,27 @@
 Integration test — verifies the full collect_signals pipeline
 with a real PostgreSQL (via testcontainers) and mocked external APIs.
 """
-import json
 
+import json
+from unittest.mock import AsyncMock, patch
+
+import httpx
 import pytest
 import respx
-import httpx
-from unittest.mock import AsyncMock, patch
-from testcontainers.postgres import PostgresContainer
-
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from testcontainers.postgres import PostgresContainer
 
 from muse.config import FocusConfig, Settings
-from muse.db import Base, Idea, Opportunity, Signal, State, make_engine, make_session_factory
+from muse.db import (
+    Base,
+    Idea,
+    Opportunity,
+    Signal,
+    State,
+    make_engine,
+    make_session_factory,
+)
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +75,11 @@ def focus():
         exclude=["crypto"],
         score_threshold=3,
         source_mapping={"PH Feed": "producthunt"},
-        indie_criteria={"max_team_size": 5, "prefer_low_infra": True, "prefer_digital_product": True},
+        indie_criteria={
+            "max_team_size": 5,
+            "prefer_low_infra": True,
+            "prefer_digital_product": True,
+        },
     )
 
 
@@ -79,28 +91,52 @@ async def test_full_pipeline(settings, focus, db):
 
     # Mock Miniflux API
     respx.get("http://miniflux:8080/v1/entries").mock(
-        return_value=httpx.Response(200, json={
-            "total": 2,
-            "entries": [
-                {"id": 1, "title": "AI Code Editor", "url": "https://x.com/1",
-                 "content": "AI-powered editor", "feed": {"title": "PH Feed"}},
-                {"id": 2, "title": "Crypto Exchange", "url": "https://x.com/2",
-                 "content": "New crypto exchange", "feed": {"title": "PH Feed"}},
-            ],
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "total": 2,
+                "entries": [
+                    {
+                        "id": 1,
+                        "title": "AI Code Editor",
+                        "url": "https://x.com/1",
+                        "content": "AI-powered editor",
+                        "feed": {"title": "PH Feed"},
+                    },
+                    {
+                        "id": 2,
+                        "title": "Crypto Exchange",
+                        "url": "https://x.com/2",
+                        "content": "New crypto exchange",
+                        "feed": {"title": "PH Feed"},
+                    },
+                ],
+            },
+        )
     )
 
     # Mock Claude API — only entry 1 passes (entry 2 filtered by keyword)
-    ai_result = json.dumps({
-        "entries": [
-            {"entry_id": 1, "score": 4, "tags": ["ai-tool"], "summary": "Good AI editor", "reason": "Real pain"}
-        ]
-    })
+    ai_result = json.dumps(
+        {
+            "entries": [
+                {
+                    "entry_id": 1,
+                    "score": 4,
+                    "tags": ["ai-tool"],
+                    "summary": "Good AI editor",
+                    "reason": "Real pain",
+                }
+            ]
+        }
+    )
     respx.post("https://api.anthropic.com/v1/messages").mock(
-        return_value=httpx.Response(200, json={
-            "content": [{"type": "text", "text": ai_result}],
-            "usage": {"input_tokens": 100, "output_tokens": 50},
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "content": [{"type": "text", "text": ai_result}],
+                "usage": {"input_tokens": 100, "output_tokens": 50},
+            },
+        )
     )
 
     # Mock Telegram
@@ -124,9 +160,11 @@ async def test_full_pipeline(settings, focus, db):
 
     # Verify: watermark updated
     async with session_factory() as session:
-        state = (await session.execute(
-            select(State.value).where(State.key == "last_processed_entry_id")
-        )).scalar_one()
+        state = (
+            await session.execute(
+                select(State.value).where(State.key == "last_processed_entry_id")
+            )
+        ).scalar_one()
         assert state == "2"  # max entry ID
 
     # Verify: Telegram push called
@@ -142,40 +180,47 @@ async def test_opportunity_pipeline(settings, focus, db):
     # Seed some signals from the "past week"
     async with session_factory() as session:
         for i in range(1, 4):
-            session.add(Signal(
-                miniflux_entry_id=100 + i,
-                title=f"AI Tool {i}",
-                url=f"https://x.com/{i}",
-                source="producthunt",
-                raw_summary=f"Description {i}",
-                ai_summary=f"AI tool summary {i}",
-                ai_tags=["ai-tool"],
-                ai_score=4,
-                ai_reason="Strong signal",
-            ))
+            session.add(
+                Signal(
+                    miniflux_entry_id=100 + i,
+                    title=f"AI Tool {i}",
+                    url=f"https://x.com/{i}",
+                    source="producthunt",
+                    raw_summary=f"Description {i}",
+                    ai_summary=f"AI tool summary {i}",
+                    ai_tags=["ai-tool"],
+                    ai_score=4,
+                    ai_reason="Strong signal",
+                )
+            )
         await session.commit()
 
     # Mock Claude API for opportunity extraction
-    ai_result = json.dumps({
-        "opportunities": [
-            {
-                "title": "AI Dev Tools Gap",
-                "description": "3 signals show unmet need",
-                "trend_category": "developer-tools",
-                "unmet_need": "Logic review automation",
-                "market_gap": "No indie solution",
-                "geo_opportunity": "",
-                "evidence_ids": [],
-                "confidence": "high",
-            }
-        ],
-        "weekly_summary": "AI dominated this week.",
-    })
+    ai_result = json.dumps(
+        {
+            "opportunities": [
+                {
+                    "title": "AI Dev Tools Gap",
+                    "description": "3 signals show unmet need",
+                    "trend_category": "developer-tools",
+                    "unmet_need": "Logic review automation",
+                    "market_gap": "No indie solution",
+                    "geo_opportunity": "",
+                    "evidence_ids": [],
+                    "confidence": "high",
+                }
+            ],
+            "weekly_summary": "AI dominated this week.",
+        }
+    )
     respx.post("https://api.anthropic.com/v1/messages").mock(
-        return_value=httpx.Response(200, json={
-            "content": [{"type": "text", "text": ai_result}],
-            "usage": {"input_tokens": 500, "output_tokens": 200},
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "content": [{"type": "text", "text": ai_result}],
+                "usage": {"input_tokens": 500, "output_tokens": 200},
+            },
+        )
     )
 
     # Mock Telegram + Email
@@ -186,8 +231,10 @@ async def test_opportunity_pipeline(settings, focus, db):
 
     from muse.scheduler import extract_opportunities_job
 
-    with patch("muse.publisher.telegram.Bot", return_value=bot_instance), \
-         patch("muse.publisher.email.aiosmtplib") as mock_smtp:
+    with (
+        patch("muse.publisher.telegram.Bot", return_value=bot_instance),
+        patch("muse.publisher.email.aiosmtplib") as mock_smtp,
+    ):
         mock_smtp.send = AsyncMock()
         await extract_opportunities_job(settings, focus, session_factory)
 
@@ -209,16 +256,18 @@ async def test_idea_pipeline(settings, focus, db):
     async with session_factory() as session:
         existing = (await session.execute(select(Opportunity))).scalars().all()
         if not existing:
-            session.add(Opportunity(
-                title="AI Dev Tools Gap",
-                description="3 signals show unmet need",
-                trend_category="developer-tools",
-                unmet_need="Logic review automation",
-                market_gap="No indie solution",
-                geo_opportunity="",
-                confidence="high",
-                signal_ids=[],
-            ))
+            session.add(
+                Opportunity(
+                    title="AI Dev Tools Gap",
+                    description="3 signals show unmet need",
+                    trend_category="developer-tools",
+                    unmet_need="Logic review automation",
+                    market_gap="No indie solution",
+                    geo_opportunity="",
+                    confidence="high",
+                    signal_ids=[],
+                )
+            )
             await session.commit()
 
     # Get opportunity ID for AI response
@@ -227,30 +276,35 @@ async def test_idea_pipeline(settings, focus, db):
         opp_id = str(opps[0].id)
 
     # Mock Claude API for idea generation
-    ai_result = json.dumps({
-        "ideas": [
-            {
-                "title": "CodeReview.ai",
-                "one_liner": "AI code review for PRs",
-                "target_users": "Small dev teams",
-                "pain_point": "Slow code review",
-                "differentiation": "Logic errors, not style",
-                "channels": ["GitHub Marketplace"],
-                "revenue_model": "freemium",
-                "key_resources": "AI expertise",
-                "cost_estimate": "Low",
-                "validation_method": "GitHub Action MVP",
-                "difficulty": 3,
-                "source_opportunity_id": opp_id,
-            }
-        ],
-        "monthly_summary": "AI dev tools dominated this month.",
-    })
+    ai_result = json.dumps(
+        {
+            "ideas": [
+                {
+                    "title": "CodeReview.ai",
+                    "one_liner": "AI code review for PRs",
+                    "target_users": "Small dev teams",
+                    "pain_point": "Slow code review",
+                    "differentiation": "Logic errors, not style",
+                    "channels": ["GitHub Marketplace"],
+                    "revenue_model": "freemium",
+                    "key_resources": "AI expertise",
+                    "cost_estimate": "Low",
+                    "validation_method": "GitHub Action MVP",
+                    "difficulty": 3,
+                    "source_opportunity_id": opp_id,
+                }
+            ],
+            "monthly_summary": "AI dev tools dominated this month.",
+        }
+    )
     respx.post("https://api.anthropic.com/v1/messages").mock(
-        return_value=httpx.Response(200, json={
-            "content": [{"type": "text", "text": ai_result}],
-            "usage": {"input_tokens": 800, "output_tokens": 400},
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "content": [{"type": "text", "text": ai_result}],
+                "usage": {"input_tokens": 800, "output_tokens": 400},
+            },
+        )
     )
 
     # Mock Telegram + Email
@@ -261,8 +315,10 @@ async def test_idea_pipeline(settings, focus, db):
 
     from muse.scheduler import generate_ideas_job
 
-    with patch("muse.publisher.telegram.Bot", return_value=bot_instance), \
-         patch("muse.publisher.email.aiosmtplib") as mock_smtp:
+    with (
+        patch("muse.publisher.telegram.Bot", return_value=bot_instance),
+        patch("muse.publisher.email.aiosmtplib") as mock_smtp,
+    ):
         mock_smtp.send = AsyncMock()
         await generate_ideas_job(settings, focus, session_factory)
 

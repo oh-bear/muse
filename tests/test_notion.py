@@ -1,7 +1,8 @@
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from muse.publisher.notion import NotionPublisher
 
@@ -46,7 +47,9 @@ def test_notion_is_configured(publisher):
 async def test_health_check(publisher):
     with patch("notion_client.AsyncClient") as mock_cls:
         mock_client = MagicMock()
-        mock_client.databases.retrieve = AsyncMock(return_value={"id": "db-123", "title": [{"plain_text": "Ideas"}]})
+        mock_client.databases.retrieve = AsyncMock(
+            return_value={"id": "db-123", "title": [{"plain_text": "Ideas"}]}
+        )
         mock_cls.return_value = mock_client
 
         result = await publisher.health_check()
@@ -128,7 +131,8 @@ async def test_pull_status_updates(publisher):
 
         assert len(updates) == 2
         assert updates[0] == (
-            "page-1", "promising",
+            "page-1",
+            "promising",
             datetime(2026, 3, 15, 10, 0, tzinfo=timezone.utc),
         )
         assert updates[1][1] == "validated"

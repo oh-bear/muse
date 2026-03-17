@@ -1,18 +1,27 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from muse.analyzer.signal import SignalDetector
 from muse.collector.miniflux import MinifluxEntry
 
 
 def _entry(eid: int, title: str) -> MinifluxEntry:
-    return MinifluxEntry(entry_id=eid, title=title, url=f"https://x.com/{eid}", content=f"Desc {title}", source="producthunt")
+    return MinifluxEntry(
+        entry_id=eid,
+        title=title,
+        url=f"https://x.com/{eid}",
+        content=f"Desc {title}",
+        source="producthunt",
+    )
 
 
 @pytest.fixture
 def detector(tmp_path):
     sys_prompt = tmp_path / "system.txt"
-    sys_prompt.write_text("Evaluate entries. Focus: $focus_areas. Exclude: $exclude_areas. Team: $max_team_size")
+    sys_prompt.write_text(
+        "Evaluate entries. Focus: $focus_areas. Exclude: $exclude_areas. Team: $max_team_size"
+    )
     user_prompt = tmp_path / "user.txt"
     user_prompt.write_text("Entries:\n$entries")
 
@@ -33,11 +42,26 @@ def detector(tmp_path):
 async def test_detect_returns_high_scoring_entries(detector):
     ai_response = {
         "entries": [
-            {"entry_id": 1, "score": 4, "tags": ["ai"], "summary": "Good tool", "reason": "Real pain"},
-            {"entry_id": 2, "score": 2, "tags": ["other"], "summary": "Meh", "reason": "Noise"},
+            {
+                "entry_id": 1,
+                "score": 4,
+                "tags": ["ai"],
+                "summary": "Good tool",
+                "reason": "Real pain",
+            },
+            {
+                "entry_id": 2,
+                "score": 2,
+                "tags": ["other"],
+                "summary": "Meh",
+                "reason": "Noise",
+            },
         ]
     }
-    detector.ai_client.call.return_value = (ai_response, {"input_tokens": 100, "output_tokens": 50})
+    detector.ai_client.call.return_value = (
+        ai_response,
+        {"input_tokens": 100, "output_tokens": 50},
+    )
 
     entries = [_entry(1, "AI Tool"), _entry(2, "Meh Tool")]
     result = await detector.detect(entries)
@@ -51,13 +75,41 @@ async def test_detect_returns_high_scoring_entries(detector):
 async def test_detect_batches_entries(detector):
     detector.batch_size = 2
     detector.ai_client.call.side_effect = [
-        ({"entries": [
-            {"entry_id": 1, "score": 4, "tags": [], "summary": "x", "reason": "y"},
-            {"entry_id": 2, "score": 4, "tags": [], "summary": "x", "reason": "y"},
-        ]}, {"input_tokens": 100, "output_tokens": 50}),
-        ({"entries": [
-            {"entry_id": 3, "score": 4, "tags": [], "summary": "x", "reason": "y"},
-        ]}, {"input_tokens": 50, "output_tokens": 25}),
+        (
+            {
+                "entries": [
+                    {
+                        "entry_id": 1,
+                        "score": 4,
+                        "tags": [],
+                        "summary": "x",
+                        "reason": "y",
+                    },
+                    {
+                        "entry_id": 2,
+                        "score": 4,
+                        "tags": [],
+                        "summary": "x",
+                        "reason": "y",
+                    },
+                ]
+            },
+            {"input_tokens": 100, "output_tokens": 50},
+        ),
+        (
+            {
+                "entries": [
+                    {
+                        "entry_id": 3,
+                        "score": 4,
+                        "tags": [],
+                        "summary": "x",
+                        "reason": "y",
+                    },
+                ]
+            },
+            {"input_tokens": 50, "output_tokens": 25},
+        ),
     ]
 
     entries = [_entry(i, f"Tool {i}") for i in range(1, 4)]
@@ -74,8 +126,20 @@ async def test_detect_tracks_failed_batches(detector):
     detector.batch_size = 2
     detector.ai_client.call.side_effect = [
         AIRequestError("API down"),
-        ({"entries": [{"entry_id": 3, "score": 4, "tags": [], "summary": "x", "reason": "y"}]},
-         {"input_tokens": 50, "output_tokens": 25}),
+        (
+            {
+                "entries": [
+                    {
+                        "entry_id": 3,
+                        "score": 4,
+                        "tags": [],
+                        "summary": "x",
+                        "reason": "y",
+                    }
+                ]
+            },
+            {"input_tokens": 50, "output_tokens": 25},
+        ),
     ]
 
     entries = [_entry(i, f"Tool {i}") for i in range(1, 4)]

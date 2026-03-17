@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 import httpx
 import structlog
@@ -12,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from muse.analyzer.ai_client import AIClient
 from muse.analyzer.idea import IdeaGenerator
+from muse.analyzer.opportunity import OpportunityExtractor
 from muse.analyzer.signal import SignalDetector
 from muse.collector.filter import pre_filter
 from muse.collector.miniflux import MinifluxCollector
 from muse.config import FocusConfig, Settings
-from muse.analyzer.opportunity import OpportunityExtractor
-from muse.db import Idea, Opportunity, Signal, State, VALID_IDEA_STATUSES
+from muse.db import VALID_IDEA_STATUSES, Idea, Opportunity, Signal, State
 from muse.publisher.email import EmailPublisher
 from muse.publisher.notion import NotionPublisher
 from muse.publisher.telegram import TelegramPublisher
@@ -44,7 +43,9 @@ async def _set_state(session: AsyncSession, key: str, value: str) -> None:
     await session.commit()
 
 
-async def collect_signals_job(settings: Settings, focus: FocusConfig, session_factory) -> None:
+async def collect_signals_job(
+    settings: Settings, focus: FocusConfig, session_factory
+) -> None:
     """Daily job: fetch → filter → AI → store → push."""
     job_id = str(uuid.uuid4())[:8]
     logger.info("job_started", job="collect_signals", job_id=job_id)
@@ -84,7 +85,11 @@ async def collect_signals_job(settings: Settings, focus: FocusConfig, session_fa
     filtered = pre_filter(entries, exclude=focus.exclude)
 
     # 4. AI signal detection
-    api_key = settings.anthropic_api_key if settings.ai_provider == "claude" else settings.openai_api_key
+    api_key = (
+        settings.anthropic_api_key
+        if settings.ai_provider == "claude"
+        else settings.openai_api_key
+    )
     ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
     detector = SignalDetector(
         ai_client=ai_client,
@@ -117,17 +122,19 @@ async def collect_signals_job(settings: Settings, focus: FocusConfig, session_fa
             if exists.scalar_one_or_none():
                 continue
 
-            session.add(Signal(
-                miniflux_entry_id=s["entry_id"],
-                title=entry.title,
-                url=entry.url,
-                source=entry.source,
-                raw_summary=entry.content[:2000],
-                ai_summary=s.get("summary", ""),
-                ai_tags=s.get("tags", []),
-                ai_score=s.get("score", 0),
-                ai_reason=s.get("reason", ""),
-            ))
+            session.add(
+                Signal(
+                    miniflux_entry_id=s["entry_id"],
+                    title=entry.title,
+                    url=entry.url,
+                    source=entry.source,
+                    raw_summary=entry.content[:2000],
+                    ai_summary=s.get("summary", ""),
+                    ai_tags=s.get("tags", []),
+                    ai_score=s.get("score", 0),
+                    ai_reason=s.get("reason", ""),
+                )
+            )
 
         # Update watermark
         max_id = max(e.entry_id for e in entries)
@@ -140,11 +147,19 @@ async def collect_signals_job(settings: Settings, focus: FocusConfig, session_fa
     except Exception as e:
         logger.error("telegram_push_failed", error=str(e))
 
-    logger.info("job_completed", job="collect_signals", job_id=job_id,
-               entries=len(entries), filtered=len(filtered), signals=len(result.signals))
+    logger.info(
+        "job_completed",
+        job="collect_signals",
+        job_id=job_id,
+        entries=len(entries),
+        filtered=len(filtered),
+        signals=len(result.signals),
+    )
 
 
-async def extract_opportunities_job(settings: Settings, focus: FocusConfig, session_factory) -> None:
+async def extract_opportunities_job(
+    settings: Settings, focus: FocusConfig, session_factory
+) -> None:
     """Weekly job: query week's signals → AI opportunity extraction → store → push."""
     job_id = str(uuid.uuid4())[:8]
     logger.info("job_started", job="extract_opportunities", job_id=job_id)
@@ -181,7 +196,11 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
     ]
 
     # 2. Run opportunity extraction
-    api_key = settings.anthropic_api_key if settings.ai_provider == "claude" else settings.openai_api_key
+    api_key = (
+        settings.anthropic_api_key
+        if settings.ai_provider == "claude"
+        else settings.openai_api_key
+    )
     ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
     extractor = OpportunityExtractor(
         ai_client=ai_client,
@@ -208,17 +227,19 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
                 if sid_str in signal_id_map:
                     evidence_uuids.append(signal_id_map[sid_str])
 
-            session.add(Opportunity(
-                title=opp["title"],
-                description=opp.get("description", ""),
-                trend_category=opp.get("trend_category", ""),
-                unmet_need=opp.get("unmet_need", ""),
-                market_gap=opp.get("market_gap", ""),
-                geo_opportunity=opp.get("geo_opportunity", ""),
-                confidence=opp.get("confidence", "medium"),
-                signal_ids=evidence_uuids,
-                week_of=today,
-            ))
+            session.add(
+                Opportunity(
+                    title=opp["title"],
+                    description=opp.get("description", ""),
+                    trend_category=opp.get("trend_category", ""),
+                    unmet_need=opp.get("unmet_need", ""),
+                    market_gap=opp.get("market_gap", ""),
+                    geo_opportunity=opp.get("geo_opportunity", ""),
+                    confidence=opp.get("confidence", "medium"),
+                    signal_ids=evidence_uuids,
+                    week_of=today,
+                )
+            )
         await session.commit()
 
     # 4. Calculate week label
@@ -241,7 +262,9 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
         smtp_port=settings.smtp_port,
         smtp_user=settings.smtp_user,
         smtp_password=settings.smtp_password,
-        recipients=[r.strip() for r in settings.email_recipients.split(",") if r.strip()],
+        recipients=[
+            r.strip() for r in settings.email_recipients.split(",") if r.strip()
+        ],
     )
     try:
         await email.send_weekly_digest(
@@ -253,11 +276,18 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
     except Exception as e:
         logger.error("email_weekly_failed", error=str(e))
 
-    logger.info("job_completed", job="extract_opportunities", job_id=job_id,
-               signals=len(db_signals), opportunities=len(extraction.opportunities))
+    logger.info(
+        "job_completed",
+        job="extract_opportunities",
+        job_id=job_id,
+        signals=len(db_signals),
+        opportunities=len(extraction.opportunities),
+    )
 
 
-async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_factory) -> None:
+async def generate_ideas_job(
+    settings: Settings, focus: FocusConfig, session_factory
+) -> None:
     """Monthly job: query month's opportunities → AI idea generation → store → push."""
     job_id = str(uuid.uuid4())[:8]
     logger.info("job_started", job="generate_ideas", job_id=job_id)
@@ -296,7 +326,11 @@ async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_fac
     ]
 
     # 3. Run IdeaGenerator
-    api_key = settings.anthropic_api_key if settings.ai_provider == "claude" else settings.openai_api_key
+    api_key = (
+        settings.anthropic_api_key
+        if settings.ai_provider == "claude"
+        else settings.openai_api_key
+    )
     ai_client = AIClient(provider=settings.ai_provider, api_key=api_key)
     generator = IdeaGenerator(
         ai_client=ai_client,
@@ -316,20 +350,22 @@ async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_fac
     async with session_factory() as session:
         for idea in generation.ideas:
             opp_id = opp_id_map.get(idea.get("source_opportunity_id"))
-            session.add(Idea(
-                title=idea["title"],
-                one_liner=idea.get("one_liner", ""),
-                target_users=idea.get("target_users", ""),
-                pain_point=idea.get("pain_point", ""),
-                differentiation=idea.get("differentiation", ""),
-                channels=idea.get("channels", []),
-                revenue_model=idea.get("revenue_model", ""),
-                key_resources=idea.get("key_resources", ""),
-                cost_estimate=idea.get("cost_estimate", ""),
-                validation_method=idea.get("validation_method", ""),
-                difficulty=idea.get("difficulty", 3),
-                opportunity_id=opp_id,
-            ))
+            session.add(
+                Idea(
+                    title=idea["title"],
+                    one_liner=idea.get("one_liner", ""),
+                    target_users=idea.get("target_users", ""),
+                    pain_point=idea.get("pain_point", ""),
+                    differentiation=idea.get("differentiation", ""),
+                    channels=idea.get("channels", []),
+                    revenue_model=idea.get("revenue_model", ""),
+                    key_resources=idea.get("key_resources", ""),
+                    cost_estimate=idea.get("cost_estimate", ""),
+                    validation_method=idea.get("validation_method", ""),
+                    difficulty=idea.get("difficulty", 3),
+                    opportunity_id=opp_id,
+                )
+            )
         await session.commit()
 
     # 5. Calculate month label
@@ -352,7 +388,9 @@ async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_fac
         smtp_port=settings.smtp_port,
         smtp_user=settings.smtp_user,
         smtp_password=settings.smtp_password,
-        recipients=[r.strip() for r in settings.email_recipients.split(",") if r.strip()],
+        recipients=[
+            r.strip() for r in settings.email_recipients.split(",") if r.strip()
+        ],
     )
     try:
         await email.send_monthly_ideas(
@@ -364,8 +402,13 @@ async def generate_ideas_job(settings: Settings, focus: FocusConfig, session_fac
     except Exception as e:
         logger.error("email_monthly_failed", error=str(e))
 
-    logger.info("job_completed", job="generate_ideas", job_id=job_id,
-               opportunities=len(db_opps), ideas=len(generation.ideas))
+    logger.info(
+        "job_completed",
+        job="generate_ideas",
+        job_id=job_id,
+        opportunities=len(db_opps),
+        ideas=len(generation.ideas),
+    )
 
 
 async def notion_sync_job(settings: Settings, session_factory) -> None:
@@ -393,7 +436,9 @@ async def notion_sync_job(settings: Settings, session_factory) -> None:
         async with session_factory() as session:
             for idea_id, page_id in pushed:
                 await session.execute(
-                    update(Idea).where(Idea.id == idea_id).values(notion_page_id=page_id)
+                    update(Idea)
+                    .where(Idea.id == idea_id)
+                    .values(notion_page_id=page_id)
                 )
             await session.commit()
         logger.info("notion_pushed", count=len(pushed))
@@ -404,11 +449,15 @@ async def notion_sync_job(settings: Settings, session_factory) -> None:
         async with session_factory() as session:
             for page_id, new_status, edited_time in updates:
                 if new_status not in VALID_IDEA_STATUSES:
-                    logger.warning("notion_invalid_status", page_id=page_id, status=new_status)
+                    logger.warning(
+                        "notion_invalid_status", page_id=page_id, status=new_status
+                    )
                     continue
                 await session.execute(
                     update(Idea)
-                    .where(Idea.notion_page_id == page_id, Idea.updated_at < edited_time)
+                    .where(
+                        Idea.notion_page_id == page_id, Idea.updated_at < edited_time
+                    )
                     .values(status=new_status, updated_at=edited_time)
                 )
             await session.commit()

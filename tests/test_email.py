@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from muse.publisher.email import EmailPublisher
 
@@ -41,7 +42,10 @@ async def test_send_weekly_digest(publisher):
         mock_smtp.send.assert_called_once()
         call_args = mock_smtp.send.call_args
         message = call_args[0][0]  # first positional arg is the message
-        assert "AI Code Review Gap" in message.get_body(preferencelist=("html",)).get_content()
+        assert (
+            "AI Code Review Gap"
+            in message.get_body(preferencelist=("html",)).get_content()
+        )
         assert len(message["To"].split(", ")) == 2
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -51,15 +51,41 @@ class NotionPublisher:
         for idea in ideas:
             properties = {
                 "Name": {"title": [{"text": {"content": idea.title}}]},
-                "One-Liner": {"rich_text": [{"text": {"content": idea.one_liner or ""}}]},
-                "Target Users": {"rich_text": [{"text": {"content": idea.target_users or ""}}]},
-                "Pain Point": {"rich_text": [{"text": {"content": idea.pain_point or ""}}]},
-                "Differentiation": {"rich_text": [{"text": {"content": idea.differentiation or ""}}]},
-                "Channels": {"rich_text": [{"text": {"content": ", ".join(idea.channels) if idea.channels else ""}}]},
-                "Revenue Model": {"rich_text": [{"text": {"content": idea.revenue_model or ""}}]},
-                "Key Resources": {"rich_text": [{"text": {"content": idea.key_resources or ""}}]},
-                "Cost Estimate": {"rich_text": [{"text": {"content": idea.cost_estimate or ""}}]},
-                "Validation Method": {"rich_text": [{"text": {"content": idea.validation_method or ""}}]},
+                "One-Liner": {
+                    "rich_text": [{"text": {"content": idea.one_liner or ""}}]
+                },
+                "Target Users": {
+                    "rich_text": [{"text": {"content": idea.target_users or ""}}]
+                },
+                "Pain Point": {
+                    "rich_text": [{"text": {"content": idea.pain_point or ""}}]
+                },
+                "Differentiation": {
+                    "rich_text": [{"text": {"content": idea.differentiation or ""}}]
+                },
+                "Channels": {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": ", ".join(idea.channels)
+                                if idea.channels
+                                else ""
+                            }
+                        }
+                    ]
+                },
+                "Revenue Model": {
+                    "rich_text": [{"text": {"content": idea.revenue_model or ""}}]
+                },
+                "Key Resources": {
+                    "rich_text": [{"text": {"content": idea.key_resources or ""}}]
+                },
+                "Cost Estimate": {
+                    "rich_text": [{"text": {"content": idea.cost_estimate or ""}}]
+                },
+                "Validation Method": {
+                    "rich_text": [{"text": {"content": idea.validation_method or ""}}]
+                },
                 "Difficulty": {"number": idea.difficulty},
                 "Status": {"select": {"name": idea.status or "pending"}},
             }

@@ -28,29 +28,45 @@ class AIClient:
 
     def __post_init__(self):
         if not self.model:
-            self.model = "claude-sonnet-4-20250514" if self.provider == "claude" else "gpt-4o-mini"
+            self.model = (
+                "claude-sonnet-4-20250514"
+                if self.provider == "claude"
+                else "gpt-4o-mini"
+            )
 
-    async def call(self, system_prompt: str, user_prompt: str) -> tuple[dict[str, Any], dict]:
+    async def call(
+        self, system_prompt: str, user_prompt: str
+    ) -> tuple[dict[str, Any], dict]:
         last_error: Exception | None = None
         current_user_prompt = user_prompt
 
         for attempt in range(self.max_retries):
             try:
-                raw_text, usage = await self._api_call(system_prompt, current_user_prompt)
+                raw_text, usage = await self._api_call(
+                    system_prompt, current_user_prompt
+                )
                 return json.loads(raw_text), usage
             except json.JSONDecodeError:
                 logger.warning("invalid_json_response", attempt=attempt + 1)
                 if attempt < self.max_retries - 1:
-                    current_user_prompt = f"{user_prompt}\n\nIMPORTANT: Respond with valid JSON only."
-                    await asyncio.sleep(self.base_delay * (2 ** attempt))
+                    current_user_prompt = (
+                        f"{user_prompt}\n\nIMPORTANT: Respond with valid JSON only."
+                    )
+                    await asyncio.sleep(self.base_delay * (2**attempt))
                 else:
-                    last_error = AIRequestError(f"Failed to get valid JSON after {self.max_retries} attempts")
+                    last_error = AIRequestError(
+                        f"Failed to get valid JSON after {self.max_retries} attempts"
+                    )
             except httpx.HTTPStatusError as e:
-                logger.warning("ai_api_error", status=e.response.status_code, attempt=attempt + 1)
+                logger.warning(
+                    "ai_api_error", status=e.response.status_code, attempt=attempt + 1
+                )
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(self.base_delay * (2 ** attempt))
+                    await asyncio.sleep(self.base_delay * (2**attempt))
                 else:
-                    last_error = AIRequestError(f"AI API failed after {self.max_retries} retries: {e}")
+                    last_error = AIRequestError(
+                        f"AI API failed after {self.max_retries} retries: {e}"
+                    )
 
         raise last_error  # type: ignore[misc]
 
@@ -59,7 +75,9 @@ class AIClient:
             return await self._call_claude(system_prompt, user_prompt)
         return await self._call_openai(system_prompt, user_prompt)
 
-    async def _call_claude(self, system_prompt: str, user_prompt: str) -> tuple[str, dict]:
+    async def _call_claude(
+        self, system_prompt: str, user_prompt: str
+    ) -> tuple[str, dict]:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 CLAUDE_API_URL,
@@ -79,11 +97,18 @@ class AIClient:
             data = resp.json()
             text = data["content"][0]["text"]
             usage = data.get("usage", {})
-            logger.info("ai_call", provider="claude", model=self.model,
-                       input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"))
+            logger.info(
+                "ai_call",
+                provider="claude",
+                model=self.model,
+                input_tokens=usage.get("input_tokens"),
+                output_tokens=usage.get("output_tokens"),
+            )
             return text, usage
 
-    async def _call_openai(self, system_prompt: str, user_prompt: str) -> tuple[str, dict]:
+    async def _call_openai(
+        self, system_prompt: str, user_prompt: str
+    ) -> tuple[str, dict]:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 OPENAI_API_URL,
@@ -104,6 +129,11 @@ class AIClient:
             data = resp.json()
             text = data["choices"][0]["message"]["content"]
             usage = data.get("usage", {})
-            logger.info("ai_call", provider="openai", model=self.model,
-                       input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"))
+            logger.info(
+                "ai_call",
+                provider="openai",
+                model=self.model,
+                input_tokens=usage.get("prompt_tokens"),
+                output_tokens=usage.get("completion_tokens"),
+            )
             return text, usage

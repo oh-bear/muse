@@ -1,7 +1,8 @@
 import json
+
+import httpx
 import pytest
 import respx
-import httpx
 
 from muse.analyzer.ai_client import AIClient, AIRequestError
 
@@ -14,10 +15,13 @@ def client():
 
 
 def _claude_response(content: str) -> httpx.Response:
-    return httpx.Response(200, json={
-        "content": [{"type": "text", "text": content}],
-        "usage": {"input_tokens": 100, "output_tokens": 50},
-    })
+    return httpx.Response(
+        200,
+        json={
+            "content": [{"type": "text", "text": content}],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
+        },
+    )
 
 
 @pytest.mark.asyncio

@@ -57,14 +57,18 @@ class IdeaGenerator:
         )
         return system_prompt, user_prompt
 
-    async def generate(self, opportunities: list[dict[str, Any]]) -> IdeaGenerationResult:
+    async def generate(
+        self, opportunities: list[dict[str, Any]]
+    ) -> IdeaGenerationResult:
         if not opportunities:
             return IdeaGenerationResult()
 
         result = IdeaGenerationResult()
 
-        chunks = [opportunities[i:i + self.max_opportunities_per_call]
-                  for i in range(0, len(opportunities), self.max_opportunities_per_call)]
+        chunks = [
+            opportunities[i : i + self.max_opportunities_per_call]
+            for i in range(0, len(opportunities), self.max_opportunities_per_call)
+        ]
 
         all_summaries = []
 
@@ -92,10 +96,15 @@ class IdeaGenerator:
             except AIRequestError as e:
                 result.failed = True
                 result.error = str(e)
-                logger.error("idea_generation_failed", chunk=chunk_idx + 1, error=str(e))
+                logger.error(
+                    "idea_generation_failed", chunk=chunk_idx + 1, error=str(e)
+                )
 
         result.monthly_summary = " ".join(all_summaries) if all_summaries else ""
 
-        logger.info("idea_generation_complete",
-                    opportunities=len(opportunities), ideas=len(result.ideas))
+        logger.info(
+            "idea_generation_complete",
+            opportunities=len(opportunities),
+            ideas=len(result.ideas),
+        )
         return result

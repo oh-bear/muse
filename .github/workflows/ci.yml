@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Lint
+        run: ruff check src/ tests/
+      - name: Format check
+        run: ruff format --check src/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pip install poetry==1.8.*
+      - name: Install dependencies
+        run: poetry install --with dev
+      - name: Run unit tests
+        run: poetry run python -m pytest tests/ --ignore=tests/test_integration.py -v
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost/test
+          MINIFLUX_URL: http://localhost:8080
+          MINIFLUX_API_KEY: test
+          TELEGRAM_BOT_TOKEN: "123:test"
+          TELEGRAM_CHAT_ID: "-100test"
+          TELEGRAM_TOPIC_ID: "0"

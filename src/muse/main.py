@@ -4,20 +4,26 @@ import asyncio
 import sys
 from pathlib import Path
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-
 import structlog
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from muse.config import FocusConfig, Settings
-from muse.db import make_engine, make_session_factory, init_schema
+from muse.db import init_schema, make_engine, make_session_factory
 from muse.logging import setup_logging
-from muse.scheduler import collect_signals_job, extract_opportunities_job, generate_ideas_job, notion_sync_job
+from muse.scheduler import (
+    collect_signals_job,
+    extract_opportunities_job,
+    generate_ideas_job,
+    notion_sync_job,
+)
 
 logger = structlog.get_logger()
 
 
-async def run_job(job_name: str, settings: Settings, focus: FocusConfig, session_factory) -> None:
+async def run_job(
+    job_name: str, settings: Settings, focus: FocusConfig, session_factory
+) -> None:
     """Run a specific job by name (CLI mode)."""
     # notion_sync has different signature (no focus)
     if job_name == "notion_sync":
@@ -103,11 +109,14 @@ async def main() -> None:
         )
         active_jobs.append("notion_sync")
 
-    logger.info("scheduler_started", timezone=settings.timezone,
-               schedule=f"daily={settings.schedule_hour:02d}:{settings.schedule_minute:02d}, "
-                       f"weekly={settings.weekly_schedule_day} {settings.weekly_schedule_hour:02d}:{settings.weekly_schedule_minute:02d}, "
-                       f"monthly=day {settings.monthly_schedule_day} {settings.monthly_schedule_hour:02d}:{settings.monthly_schedule_minute:02d}",
-               jobs=active_jobs)
+    logger.info(
+        "scheduler_started",
+        timezone=settings.timezone,
+        schedule=f"daily={settings.schedule_hour:02d}:{settings.schedule_minute:02d}, "
+        f"weekly={settings.weekly_schedule_day} {settings.weekly_schedule_hour:02d}:{settings.weekly_schedule_minute:02d}, "
+        f"monthly=day {settings.monthly_schedule_day} {settings.monthly_schedule_hour:02d}:{settings.monthly_schedule_minute:02d}",
+        jobs=active_jobs,
+    )
     scheduler.start()
 
     try:

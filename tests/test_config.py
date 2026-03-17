@@ -1,8 +1,6 @@
 import os
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 import yaml
 
 
@@ -22,7 +20,9 @@ def test_settings_loads_from_env():
     }
     with patch.dict(os.environ, env, clear=True):
         from importlib import reload
+
         import muse.config as cfg_mod
+
         reload(cfg_mod)
         s = cfg_mod.Settings()
         assert s.database_url == env["DATABASE_URL"]
@@ -47,6 +47,7 @@ def test_focus_config_loads_yaml(tmp_path):
     f.write_text(yaml.dump(data))
 
     from muse.config import FocusConfig
+
     cfg = FocusConfig.from_yaml(f)
     assert cfg.focus_areas == ["ai-tools", "saas"]
     assert cfg.exclude == ["crypto"]
@@ -61,6 +62,7 @@ def test_focus_config_defaults(tmp_path):
     f.write_text(yaml.dump({"focus_areas": ["ai-tools"]}))
 
     from muse.config import FocusConfig
+
     cfg = FocusConfig.from_yaml(f)
     assert cfg.score_threshold == 3
     assert cfg.exclude == []

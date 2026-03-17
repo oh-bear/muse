@@ -15,7 +15,9 @@ class TelegramPublisher:
     chat_id: str
     topic_id: int | None = None
 
-    async def send_daily_summary(self, signals: list[dict[str, Any]], total_processed: int) -> None:
+    async def send_daily_summary(
+        self, signals: list[dict[str, Any]], total_processed: int
+    ) -> None:
         top_signals = sorted(signals, key=lambda s: s.get("score", 0), reverse=True)[:3]
 
         lines = [
@@ -96,7 +98,9 @@ class TelegramPublisher:
                 stars = "⭐" * diff
                 lines.append(f"{i}\\. *{idea['title']}* {stars}")
                 lines.append(f"   {idea.get('one_liner', '')}")
-                lines.append(f"   Revenue: {idea.get('revenue_model', '')} | Difficulty: {diff}/5")
+                lines.append(
+                    f"   Revenue: {idea.get('revenue_model', '')} | Difficulty: {diff}/5"
+                )
                 lines.append("")
         else:
             lines.append("")

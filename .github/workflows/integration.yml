@@ -1,0 +1,44 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: muse_test
+          POSTGRES_USER: muse
+          POSTGRES_PASSWORD: muse_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U muse"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pip install poetry==1.8.*
+      - name: Install dependencies
+        run: poetry install --with dev
+      - name: Run integration tests
+        run: poetry run python -m pytest tests/test_integration.py -v
+        env:
+          DATABASE_URL: postgresql+asyncpg://muse:muse_test@localhost:5432/muse_test
+          MINIFLUX_URL: http://localhost:8080
+          MINIFLUX_API_KEY: test
+          TELEGRAM_BOT_TOKEN: "123:test"
+          TELEGRAM_CHAT_ID: "-100test"
+          TELEGRAM_TOPIC_ID: "0"
+          TESTCONTAINERS_RYUK_DISABLED: "true"

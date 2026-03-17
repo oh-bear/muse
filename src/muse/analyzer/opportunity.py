@@ -63,8 +63,10 @@ class OpportunityExtractor:
         result = ExtractionResult()
 
         # Chunk signals if volume is high
-        chunks = [signals[i:i + self.max_signals_per_call]
-                  for i in range(0, len(signals), self.max_signals_per_call)]
+        chunks = [
+            signals[i : i + self.max_signals_per_call]
+            for i in range(0, len(signals), self.max_signals_per_call)
+        ]
 
         all_summaries = []
 
@@ -92,10 +94,15 @@ class OpportunityExtractor:
             except AIRequestError as e:
                 result.failed = True
                 result.error = str(e)
-                logger.error("opportunity_extraction_failed", chunk=chunk_idx + 1, error=str(e))
+                logger.error(
+                    "opportunity_extraction_failed", chunk=chunk_idx + 1, error=str(e)
+                )
 
         result.weekly_summary = " ".join(all_summaries) if all_summaries else ""
 
-        logger.info("opportunity_extraction_complete",
-                    signals=len(signals), opportunities=len(result.opportunities))
+        logger.info(
+            "opportunity_extraction_complete",
+            signals=len(signals),
+            opportunities=len(result.opportunities),
+        )
         return result

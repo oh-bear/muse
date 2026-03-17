@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -60,26 +60,29 @@ async def test_generate_ideas_job_full_flow(settings, focus):
     mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("muse.scheduler.IdeaGenerator") as mock_gen_cls, \
-         patch("muse.scheduler.TelegramPublisher") as mock_tg_cls, \
-         patch("muse.scheduler.EmailPublisher") as mock_email_cls:
-
+    with (
+        patch("muse.scheduler.IdeaGenerator") as mock_gen_cls,
+        patch("muse.scheduler.TelegramPublisher") as mock_tg_cls,
+        patch("muse.scheduler.EmailPublisher") as mock_email_cls,
+    ):
         mock_gen = AsyncMock()
         mock_gen.generate.return_value = MagicMock(
-            ideas=[{
-                "title": "CodeReview.ai",
-                "one_liner": "AI code review",
-                "target_users": "Dev teams",
-                "pain_point": "Slow review",
-                "differentiation": "Logic focus",
-                "channels": ["GitHub"],
-                "revenue_model": "freemium",
-                "key_resources": "AI",
-                "cost_estimate": "Low",
-                "validation_method": "MVP",
-                "difficulty": 3,
-                "source_opportunity_id": str(mock_opp.id),
-            }],
+            ideas=[
+                {
+                    "title": "CodeReview.ai",
+                    "one_liner": "AI code review",
+                    "target_users": "Dev teams",
+                    "pain_point": "Slow review",
+                    "differentiation": "Logic focus",
+                    "channels": ["GitHub"],
+                    "revenue_model": "freemium",
+                    "key_resources": "AI",
+                    "cost_estimate": "Low",
+                    "validation_method": "MVP",
+                    "difficulty": 3,
+                    "source_opportunity_id": str(mock_opp.id),
+                }
+            ],
             monthly_summary="AI dominated.",
             failed=False,
         )

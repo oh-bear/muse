@@ -46,6 +46,7 @@ class Signal(Base):
 
 class State(Base):
     """Key-value store for worker state (e.g. last_processed_entry_id)."""
+
     __tablename__ = "state"
     __table_args__ = {"schema": "muse"}
 
@@ -72,7 +73,9 @@ class Opportunity(Base):
     market_gap: Mapped[str] = mapped_column(Text)
     geo_opportunity: Mapped[str] = mapped_column(Text, default="")
     confidence: Mapped[str] = mapped_column(String(16), default="medium")
-    signal_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), default=list)
+    signal_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), default=list
+    )
     week_of: Mapped[date] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

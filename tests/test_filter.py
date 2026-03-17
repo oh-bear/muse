@@ -3,7 +3,9 @@ from muse.collector.miniflux import MinifluxEntry
 
 
 def _entry(title: str, content: str = "") -> MinifluxEntry:
-    return MinifluxEntry(entry_id=1, title=title, url="https://x.com", content=content, source="test")
+    return MinifluxEntry(
+        entry_id=1, title=title, url="https://x.com", content=content, source="test"
+    )
 
 
 def test_exclude_matching_keywords():

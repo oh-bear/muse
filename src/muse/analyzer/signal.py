@@ -58,7 +58,10 @@ class SignalDetector:
 
     async def detect(self, entries: list[MinifluxEntry]) -> DetectionResult:
         result = DetectionResult()
-        batches = [entries[i:i + self.batch_size] for i in range(0, len(entries), self.batch_size)]
+        batches = [
+            entries[i : i + self.batch_size]
+            for i in range(0, len(entries), self.batch_size)
+        ]
         result.total_batches = len(batches)
 
         for batch_idx, batch in enumerate(batches):
@@ -83,7 +86,15 @@ class SignalDetector:
                 logger.error("signal_batch_failed", batch=batch_idx + 1, error=str(e))
 
         if batches and result.failed_batches / len(batches) > 0.5:
-            logger.critical("majority_batches_failed", failed=result.failed_batches, total=len(batches))
+            logger.critical(
+                "majority_batches_failed",
+                failed=result.failed_batches,
+                total=len(batches),
+            )
 
-        logger.info("signal_detection_complete", total_entries=len(entries), signals=len(result.signals))
+        logger.info(
+            "signal_detection_complete",
+            total_entries=len(entries),
+            signals=len(result.signals),
+        )
         return result

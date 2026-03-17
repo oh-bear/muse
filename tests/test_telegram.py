@@ -1,5 +1,6 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from muse.publisher.telegram import TelegramPublisher
 
@@ -17,17 +18,41 @@ def mock_bot():
     bot_instance.__aenter__ = AsyncMock(return_value=bot_instance)
     bot_instance.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("muse.publisher.telegram.Bot", return_value=bot_instance) as mock_cls:
+    with patch("muse.publisher.telegram.Bot", return_value=bot_instance):
         yield bot_instance
 
 
 @pytest.mark.asyncio
 async def test_send_daily_summary(publisher, mock_bot):
     signals = [
-        {"entry_id": 1, "score": 5, "tags": ["ai"], "summary": "Amazing AI tool", "reason": "Strong signal"},
-        {"entry_id": 2, "score": 4, "tags": ["saas"], "summary": "New SaaS thing", "reason": "Good timing"},
-        {"entry_id": 3, "score": 3, "tags": ["dev"], "summary": "Dev tool", "reason": "Decent"},
-        {"entry_id": 4, "score": 4, "tags": ["ai"], "summary": "Another AI", "reason": "Promising"},
+        {
+            "entry_id": 1,
+            "score": 5,
+            "tags": ["ai"],
+            "summary": "Amazing AI tool",
+            "reason": "Strong signal",
+        },
+        {
+            "entry_id": 2,
+            "score": 4,
+            "tags": ["saas"],
+            "summary": "New SaaS thing",
+            "reason": "Good timing",
+        },
+        {
+            "entry_id": 3,
+            "score": 3,
+            "tags": ["dev"],
+            "summary": "Dev tool",
+            "reason": "Decent",
+        },
+        {
+            "entry_id": 4,
+            "score": 4,
+            "tags": ["ai"],
+            "summary": "Another AI",
+            "reason": "Promising",
+        },
     ]
 
     await publisher.send_daily_summary(signals, total_processed=100)
@@ -86,8 +111,18 @@ async def test_send_weekly_brief(publisher, mock_bot):
 @pytest.mark.asyncio
 async def test_send_monthly_ideas(publisher, mock_bot):
     ideas = [
-        {"title": "CodeReview.ai", "one_liner": "AI code review", "revenue_model": "freemium", "difficulty": 3},
-        {"title": "LocalPay SEA", "one_liner": "Payment integration", "revenue_model": "marketplace", "difficulty": 4},
+        {
+            "title": "CodeReview.ai",
+            "one_liner": "AI code review",
+            "revenue_model": "freemium",
+            "difficulty": 3,
+        },
+        {
+            "title": "LocalPay SEA",
+            "one_liner": "Payment integration",
+            "revenue_model": "marketplace",
+            "difficulty": 4,
+        },
     ]
 
     await publisher.send_monthly_ideas(

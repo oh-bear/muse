@@ -1,7 +1,8 @@
-import pytest
 from unittest.mock import AsyncMock
 
-from muse.analyzer.idea import IdeaGenerator, IdeaGenerationResult
+import pytest
+
+from muse.analyzer.idea import IdeaGenerator
 
 
 def _opp(oid: int, title: str, confidence: str = "high") -> dict:
@@ -55,7 +56,10 @@ async def test_generate_returns_ideas(generator):
         ],
         "monthly_summary": "AI tools dominated.",
     }
-    generator.ai_client.call.return_value = (ai_response, {"input_tokens": 500, "output_tokens": 300})
+    generator.ai_client.call.return_value = (
+        ai_response,
+        {"input_tokens": 500, "output_tokens": 300},
+    )
 
     opps = [_opp(1, "AI Code Review Gap")]
     result = await generator.generate(opps)
@@ -71,20 +75,50 @@ async def test_generate_chunks_large_sets(generator):
     generator.max_opportunities_per_call = 2
 
     generator.ai_client.call.side_effect = [
-        ({"ideas": [
-            {"title": "Idea 1", "one_liner": "o", "target_users": "t",
-             "pain_point": "p", "differentiation": "d", "channels": [],
-             "revenue_model": "freemium", "key_resources": "k",
-             "cost_estimate": "c", "validation_method": "v", "difficulty": 3,
-             "source_opportunity_id": "uuid-1"},
-        ], "monthly_summary": "Summary 1."}, {"input_tokens": 100, "output_tokens": 50}),
-        ({"ideas": [
-            {"title": "Idea 2", "one_liner": "o", "target_users": "t",
-             "pain_point": "p", "differentiation": "d", "channels": [],
-             "revenue_model": "subscription", "key_resources": "k",
-             "cost_estimate": "c", "validation_method": "v", "difficulty": 2,
-             "source_opportunity_id": "uuid-3"},
-        ], "monthly_summary": "Summary 2."}, {"input_tokens": 100, "output_tokens": 50}),
+        (
+            {
+                "ideas": [
+                    {
+                        "title": "Idea 1",
+                        "one_liner": "o",
+                        "target_users": "t",
+                        "pain_point": "p",
+                        "differentiation": "d",
+                        "channels": [],
+                        "revenue_model": "freemium",
+                        "key_resources": "k",
+                        "cost_estimate": "c",
+                        "validation_method": "v",
+                        "difficulty": 3,
+                        "source_opportunity_id": "uuid-1",
+                    },
+                ],
+                "monthly_summary": "Summary 1.",
+            },
+            {"input_tokens": 100, "output_tokens": 50},
+        ),
+        (
+            {
+                "ideas": [
+                    {
+                        "title": "Idea 2",
+                        "one_liner": "o",
+                        "target_users": "t",
+                        "pain_point": "p",
+                        "differentiation": "d",
+                        "channels": [],
+                        "revenue_model": "subscription",
+                        "key_resources": "k",
+                        "cost_estimate": "c",
+                        "validation_method": "v",
+                        "difficulty": 2,
+                        "source_opportunity_id": "uuid-3",
+                    },
+                ],
+                "monthly_summary": "Summary 2.",
+            },
+            {"input_tokens": 100, "output_tokens": 50},
+        ),
     ]
 
     opps = [_opp(i, f"Opp {i}") for i in range(1, 4)]
@@ -97,6 +131,7 @@ async def test_generate_chunks_large_sets(generator):
 @pytest.mark.asyncio
 async def test_generate_handles_ai_failure(generator):
     from muse.analyzer.ai_client import AIRequestError
+
     generator.ai_client.call.side_effect = AIRequestError("API down")
 
     opps = [_opp(1, "Test")]
@@ -115,13 +150,28 @@ async def test_generate_partial_chunk_failure(generator):
     generator.max_opportunities_per_call = 1
 
     generator.ai_client.call.side_effect = [
-        ({"ideas": [
-            {"title": "Surviving Idea", "one_liner": "o", "target_users": "t",
-             "pain_point": "p", "differentiation": "d", "channels": [],
-             "revenue_model": "freemium", "key_resources": "k",
-             "cost_estimate": "c", "validation_method": "v", "difficulty": 3,
-             "source_opportunity_id": "uuid-1"},
-        ], "monthly_summary": "Partial."}, {"input_tokens": 100, "output_tokens": 50}),
+        (
+            {
+                "ideas": [
+                    {
+                        "title": "Surviving Idea",
+                        "one_liner": "o",
+                        "target_users": "t",
+                        "pain_point": "p",
+                        "differentiation": "d",
+                        "channels": [],
+                        "revenue_model": "freemium",
+                        "key_resources": "k",
+                        "cost_estimate": "c",
+                        "validation_method": "v",
+                        "difficulty": 3,
+                        "source_opportunity_id": "uuid-1",
+                    },
+                ],
+                "monthly_summary": "Partial.",
+            },
+            {"input_tokens": 100, "output_tokens": 50},
+        ),
         AIRequestError("Chunk 2 failed"),
     ]
 

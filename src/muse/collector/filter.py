@@ -24,5 +24,7 @@ def pre_filter(
         result.append(entry)
 
     filtered_count = len(entries) - len(result)
-    logger.info("pre_filter", total=len(entries), passed=len(result), filtered=filtered_count)
+    logger.info(
+        "pre_filter", total=len(entries), passed=len(result), filtered=filtered_count
+    )
     return result

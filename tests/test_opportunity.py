@@ -1,10 +1,13 @@
-import pytest
 from unittest.mock import AsyncMock
 
-from muse.analyzer.opportunity import OpportunityExtractor, ExtractionResult
+import pytest
+
+from muse.analyzer.opportunity import OpportunityExtractor
 
 
-def _signal(sid: int, title: str, score: int = 4, tags: list[str] | None = None) -> dict:
+def _signal(
+    sid: int, title: str, score: int = 4, tags: list[str] | None = None
+) -> dict:
     return {
         "id": f"uuid-{sid}",
         "title": title,
@@ -49,7 +52,10 @@ async def test_extract_returns_opportunities(extractor):
         ],
         "weekly_summary": "AI tools dominated this week.",
     }
-    extractor.ai_client.call.return_value = (ai_response, {"input_tokens": 500, "output_tokens": 200})
+    extractor.ai_client.call.return_value = (
+        ai_response,
+        {"input_tokens": 500, "output_tokens": 200},
+    )
 
     signals = [_signal(1, "AI Editor"), _signal(2, "Code Review Bot")]
     result = await extractor.extract(signals)
@@ -64,16 +70,42 @@ async def test_extract_chunks_large_signal_sets(extractor):
     extractor.max_signals_per_call = 2
 
     extractor.ai_client.call.side_effect = [
-        ({"opportunities": [
-            {"title": "Opp 1", "description": "d", "trend_category": "ai",
-             "unmet_need": "n", "market_gap": "g", "geo_opportunity": "",
-             "evidence_ids": [1, 2], "confidence": "high"},
-        ], "weekly_summary": "Summary 1."}, {"input_tokens": 100, "output_tokens": 50}),
-        ({"opportunities": [
-            {"title": "Opp 2", "description": "d", "trend_category": "dev",
-             "unmet_need": "n", "market_gap": "g", "geo_opportunity": "",
-             "evidence_ids": [3], "confidence": "medium"},
-        ], "weekly_summary": "Summary 2."}, {"input_tokens": 100, "output_tokens": 50}),
+        (
+            {
+                "opportunities": [
+                    {
+                        "title": "Opp 1",
+                        "description": "d",
+                        "trend_category": "ai",
+                        "unmet_need": "n",
+                        "market_gap": "g",
+                        "geo_opportunity": "",
+                        "evidence_ids": [1, 2],
+                        "confidence": "high",
+                    },
+                ],
+                "weekly_summary": "Summary 1.",
+            },
+            {"input_tokens": 100, "output_tokens": 50},
+        ),
+        (
+            {
+                "opportunities": [
+                    {
+                        "title": "Opp 2",
+                        "description": "d",
+                        "trend_category": "dev",
+                        "unmet_need": "n",
+                        "market_gap": "g",
+                        "geo_opportunity": "",
+                        "evidence_ids": [3],
+                        "confidence": "medium",
+                    },
+                ],
+                "weekly_summary": "Summary 2.",
+            },
+            {"input_tokens": 100, "output_tokens": 50},
+        ),
     ]
 
     signals = [_signal(i, f"Signal {i}") for i in range(1, 4)]
@@ -86,6 +118,7 @@ async def test_extract_chunks_large_signal_sets(extractor):
 @pytest.mark.asyncio
 async def test_extract_handles_ai_failure(extractor):
     from muse.analyzer.ai_client import AIRequestError
+
     extractor.ai_client.call.side_effect = AIRequestError("API down")
 
     signals = [_signal(1, "Test")]

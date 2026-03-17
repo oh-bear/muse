@@ -1,11 +1,9 @@
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from muse.config import FocusConfig, Settings
-from muse.db import Signal, Opportunity
 
 
 @pytest.fixture
@@ -59,22 +57,25 @@ async def test_extract_opportunities_job_queries_week_signals(settings, focus):
     mock_session_factory.return_value.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("muse.scheduler.OpportunityExtractor") as mock_extractor_cls, \
-         patch("muse.scheduler.TelegramPublisher") as mock_tg_cls, \
-         patch("muse.scheduler.EmailPublisher") as mock_email_cls:
-
+    with (
+        patch("muse.scheduler.OpportunityExtractor") as mock_extractor_cls,
+        patch("muse.scheduler.TelegramPublisher") as mock_tg_cls,
+        patch("muse.scheduler.EmailPublisher") as mock_email_cls,
+    ):
         mock_extractor = AsyncMock()
         mock_extractor.extract.return_value = MagicMock(
-            opportunities=[{
-                "title": "Test Opp",
-                "description": "desc",
-                "trend_category": "ai",
-                "unmet_need": "need",
-                "market_gap": "gap",
-                "geo_opportunity": "",
-                "evidence_ids": [1],
-                "confidence": "high",
-            }],
+            opportunities=[
+                {
+                    "title": "Test Opp",
+                    "description": "desc",
+                    "trend_category": "ai",
+                    "unmet_need": "need",
+                    "market_gap": "gap",
+                    "geo_opportunity": "",
+                    "evidence_ids": [1],
+                    "confidence": "high",
+                }
+            ],
             weekly_summary="Summary",
             failed=False,
         )
