@@ -18,9 +18,32 @@ languages:
   - zh
 
 source_mapping:
+  # product-discovery
   "Product Hunt - Today": producthunt
   "Hacker News - Best": hackernews
-  "Indie Hackers - Feed": indiehackers
+  "GitHub Trending": github-trending
+  "HN Ask": hackernews-ask
+  # tech-trends
+  "TechCrunch": techcrunch
+  "The Verge": theverge
+  "Ars Technica": arstechnica
+  "Y Combinator Blog": ycombinator
+  "Stratechery": stratechery
+  # ai-devtools
+  "OpenAI Blog": openai
+  "Hugging Face Blog": huggingface
+  "Simon Willison": simonwillison
+  "The Changelog": changelog
+  # reddit
+  "r/SideProject": reddit-sideproject
+  "r/startups": reddit-startups
+  "r/Entrepreneur": reddit-entrepreneur
+  "r/SaaS": reddit-saas
+  # chinese
+  "36氪": 36kr
+  "少数派": sspai
+  "小众软件": appinn
+  "V2EX": v2ex
 
 indie_criteria:
   max_team_size: 5
