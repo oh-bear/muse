@@ -11,6 +11,7 @@ RUN poetry install --only main --no-interaction --no-ansi
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
 COPY config/ ./config/
+COPY templates/ ./templates/
 COPY src/ ./src/
 
 CMD ["python", "-m", "muse.main"]
