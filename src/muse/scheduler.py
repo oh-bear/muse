@@ -211,6 +211,7 @@ async def extract_opportunities_job(settings: Settings, focus: FocusConfig, sess
                 unmet_need=opp.get("unmet_need", ""),
                 market_gap=opp.get("market_gap", ""),
                 geo_opportunity=opp.get("geo_opportunity", ""),
+                confidence=opp.get("confidence", "medium"),
                 signal_ids=evidence_uuids,
                 week_of=today,
             ))

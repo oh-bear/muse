@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     weekly_schedule_hour: int = 10
     weekly_schedule_minute: int = 0
 
+    # Monthly schedule (1st of month)
+    monthly_schedule_day: int = 1
+    monthly_schedule_hour: int = 10
+    monthly_schedule_minute: int = 0
+
+    # Notion sync interval (hours, 0 = disabled)
+    notion_sync_interval_hours: int = 6
+
     class Config:
         env_file = ".env"
 
