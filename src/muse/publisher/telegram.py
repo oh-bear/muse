@@ -72,6 +72,39 @@ class TelegramPublisher:
         await self._send(message)
         logger.info("telegram_weekly_sent", opportunities=len(opportunities))
 
+    async def send_monthly_ideas(
+        self,
+        ideas: list[dict[str, Any]],
+        monthly_summary: str,
+        opportunity_count: int,
+        month_label: str,
+    ) -> None:
+        lines = [
+            "💡 *Muse Monthly Ideas*",
+            f"_{month_label} · {opportunity_count} opportunities → {len(ideas)} ideas_",
+        ]
+
+        if monthly_summary:
+            lines.append("")
+            lines.append(monthly_summary)
+
+        if ideas:
+            lines.append("")
+            for i, idea in enumerate(ideas, 1):
+                diff = idea.get("difficulty", 3)
+                stars = "⭐" * diff
+                lines.append(f"{i}\\. *{idea['title']}* {stars}")
+                lines.append(f"   {idea.get('one_liner', '')}")
+                lines.append(f"   Revenue: {idea.get('revenue_model', '')} | Difficulty: {diff}/5")
+                lines.append("")
+        else:
+            lines.append("")
+            lines.append("No ideas generated this month\\.")
+
+        message = "\n".join(lines)
+        await self._send(message)
+        logger.info("telegram_monthly_sent", ideas=len(ideas))
+
     async def send_alert(self, message: str) -> None:
         text = f"🚨 *Muse Alert*\n\n{message}"
         await self._send(text)

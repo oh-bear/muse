@@ -84,6 +84,27 @@ async def test_send_weekly_brief(publisher, mock_bot):
 
 
 @pytest.mark.asyncio
+async def test_send_monthly_ideas(publisher, mock_bot):
+    ideas = [
+        {"title": "CodeReview.ai", "one_liner": "AI code review", "revenue_model": "freemium", "difficulty": 3},
+        {"title": "LocalPay SEA", "one_liner": "Payment integration", "revenue_model": "marketplace", "difficulty": 4},
+    ]
+
+    await publisher.send_monthly_ideas(
+        ideas=ideas,
+        monthly_summary="AI tools dominated this month.",
+        opportunity_count=5,
+        month_label="2026-03",
+    )
+
+    mock_bot.send_message.assert_called_once()
+    message = mock_bot.send_message.call_args[1]["text"]
+    assert "2026-03" in message
+    assert "CodeReview.ai" in message
+    assert "5" in message
+
+
+@pytest.mark.asyncio
 async def test_send_daily_summary_empty_signals(publisher, mock_bot):
     await publisher.send_daily_summary([], total_processed=50)
 

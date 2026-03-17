@@ -46,6 +46,41 @@ async def test_send_weekly_digest(publisher):
 
 
 @pytest.mark.asyncio
+async def test_send_monthly_ideas(publisher):
+    ideas = [
+        {
+            "title": "CodeReview.ai",
+            "one_liner": "AI code review for PRs",
+            "target_users": "Small dev teams",
+            "pain_point": "Slow reviews",
+            "differentiation": "Logic, not style",
+            "channels": ["GitHub Marketplace"],
+            "revenue_model": "freemium",
+            "key_resources": "AI expertise",
+            "cost_estimate": "Low",
+            "validation_method": "GitHub Action MVP",
+            "difficulty": 3,
+        },
+    ]
+
+    with patch("muse.publisher.email.aiosmtplib") as mock_smtp:
+        mock_smtp.send = AsyncMock()
+        await publisher.send_monthly_ideas(
+            ideas=ideas,
+            monthly_summary="AI tools dominated.",
+            opportunity_count=5,
+            month_label="2026-03",
+        )
+
+        mock_smtp.send.assert_called_once()
+        call_args = mock_smtp.send.call_args
+        message = call_args[0][0]
+        html = message.get_body(preferencelist=("html",)).get_content()
+        assert "CodeReview.ai" in html
+        assert "2026-03" in message["Subject"]
+
+
+@pytest.mark.asyncio
 async def test_send_skips_when_no_host(publisher):
     publisher.smtp_host = ""
 
