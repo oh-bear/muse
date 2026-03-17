@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 import structlog
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from muse.config import FocusConfig, Settings
@@ -56,10 +55,9 @@ async def main() -> None:
         await engine.dispose()
         return
 
-    # Scheduler mode
-    sync_url = settings.database_url.replace("+asyncpg", "")
-    jobstores = {"default": SQLAlchemyJobStore(url=sync_url, tableschema="muse")}
-    scheduler = AsyncIOScheduler(jobstores=jobstores, timezone=settings.timezone)
+    # Scheduler mode (memory jobstore — jobs re-register on startup,
+    # idempotent via watermarks, no pickle serialization issues)
+    scheduler = AsyncIOScheduler(timezone=settings.timezone)
 
     scheduler.add_job(
         collect_signals_job,
