@@ -71,6 +71,8 @@ class FocusConfig:
 
     @classmethod
     def from_yaml(cls, path: Path) -> FocusConfig:
+        if not path.exists():
+            return cls()
         with open(path) as f:
             data = yaml.safe_load(f) or {}
         return cls(

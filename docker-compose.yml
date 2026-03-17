@@ -43,8 +43,6 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-muse}:${POSTGRES_PASSWORD:-muse_dev}@postgres:5432/${POSTGRES_DB:-muse}
       MINIFLUX_URL: http://miniflux:8080
-    volumes:
-      - ./config:/app/config:ro
 
 volumes:
   pgdata:
