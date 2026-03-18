@@ -36,7 +36,7 @@ class MinifluxCollector:
         offset = 0
 
         async with httpx.AsyncClient(
-            headers={"X-Auth-Token": self.api_key},
+            headers={"X-API-Key": self.api_key},
             timeout=30.0,
         ) as client:
             while True:
