@@ -16,4 +16,7 @@ COPY src/ ./src/
 
 RUN poetry install --only main --no-interaction --no-ansi
 
-CMD ["python", "-m", "muse.main"]
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]
