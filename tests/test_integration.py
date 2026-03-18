@@ -4,7 +4,7 @@ with a real PostgreSQL (via testcontainers) and mocked external APIs.
 """
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -89,31 +89,27 @@ async def test_full_pipeline(settings, focus, db):
     """Entries flow through collect → filter → AI → store → push."""
     _, _, session_factory = db
 
-    # Mock Miniflux API
-    respx.get("http://miniflux:8080/v1/entries").mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "total": 2,
-                "entries": [
-                    {
-                        "id": 1,
-                        "title": "AI Code Editor",
-                        "url": "https://x.com/1",
-                        "content": "AI-powered editor",
-                        "feed": {"title": "PH Feed"},
-                    },
-                    {
-                        "id": 2,
-                        "title": "Crypto Exchange",
-                        "url": "https://x.com/2",
-                        "content": "New crypto exchange",
-                        "feed": {"title": "PH Feed"},
-                    },
-                ],
+    # Mock Miniflux client
+    mock_miniflux = MagicMock()
+    mock_miniflux.get_entries.return_value = {
+        "total": 2,
+        "entries": [
+            {
+                "id": 1,
+                "title": "AI Code Editor",
+                "url": "https://x.com/1",
+                "content": "AI-powered editor",
+                "feed": {"title": "PH Feed"},
             },
-        )
-    )
+            {
+                "id": 2,
+                "title": "Crypto Exchange",
+                "url": "https://x.com/2",
+                "content": "New crypto exchange",
+                "feed": {"title": "PH Feed"},
+            },
+        ],
+    }
 
     # Mock Claude API — only entry 1 passes (entry 2 filtered by keyword)
     ai_result = json.dumps(
@@ -147,7 +143,10 @@ async def test_full_pipeline(settings, focus, db):
 
     from muse.scheduler import collect_signals_job
 
-    with patch("muse.publisher.telegram.Bot", return_value=bot_instance):
+    with (
+        patch("muse.publisher.telegram.Bot", return_value=bot_instance),
+        patch("muse.collector.miniflux.miniflux_client.Client", return_value=mock_miniflux),
+    ):
         await collect_signals_job(settings, focus, session_factory)
 
     # Verify: signal stored

@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import httpx
 import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,13 +67,9 @@ async def collect_signals_job(
     )
     try:
         entries = await collector.fetch_new_entries(after_entry_id=last_id)
-    except httpx.HTTPStatusError as e:
-        logger.error("miniflux_unreachable", status=e.response.status_code)
-        await telegram.send_alert(f"Miniflux API error: HTTP {e.response.status_code}")
-        return
-    except httpx.ConnectError:
-        logger.error("miniflux_unreachable", error="connection refused")
-        await telegram.send_alert("Miniflux unreachable: connection refused")
+    except Exception as e:
+        logger.error("miniflux_unreachable", error=str(e))
+        await telegram.send_alert(f"Miniflux API error: {e}")
         return
 
     if not entries:
