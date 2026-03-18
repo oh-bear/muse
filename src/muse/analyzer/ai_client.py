@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -35,6 +36,12 @@ class AIClient:
                 else "gpt-4o-mini"
             )
 
+    @staticmethod
+    def _strip_code_block(text: str) -> str:
+        """Strip markdown code block wrapper (```json ... ```) if present."""
+        match = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
+        return match.group(1).strip() if match else text.strip()
+
     async def call(
         self, system_prompt: str, user_prompt: str
     ) -> tuple[dict[str, Any], dict]:
@@ -46,7 +53,8 @@ class AIClient:
                 raw_text, usage = await self._api_call(
                     system_prompt, current_user_prompt
                 )
-                return json.loads(raw_text), usage
+                clean_text = self._strip_code_block(raw_text)
+                return json.loads(clean_text), usage
             except json.JSONDecodeError:
                 logger.warning("invalid_json_response", attempt=attempt + 1)
                 if attempt < self.max_retries - 1:

@@ -86,7 +86,10 @@ async def collect_signals_job(
         else settings.openai_api_key
     )
     ai_client = AIClient(
-        provider=settings.ai_provider, api_key=api_key, base_url=settings.openai_base_url
+        provider=settings.ai_provider,
+        api_key=api_key,
+        model=settings.ai_model,
+        base_url=settings.openai_base_url,
     )
     detector = SignalDetector(
         ai_client=ai_client,
@@ -199,7 +202,10 @@ async def extract_opportunities_job(
         else settings.openai_api_key
     )
     ai_client = AIClient(
-        provider=settings.ai_provider, api_key=api_key, base_url=settings.openai_base_url
+        provider=settings.ai_provider,
+        api_key=api_key,
+        model=settings.ai_model,
+        base_url=settings.openai_base_url,
     )
     extractor = OpportunityExtractor(
         ai_client=ai_client,
@@ -331,7 +337,10 @@ async def generate_ideas_job(
         else settings.openai_api_key
     )
     ai_client = AIClient(
-        provider=settings.ai_provider, api_key=api_key, base_url=settings.openai_base_url
+        provider=settings.ai_provider,
+        api_key=api_key,
+        model=settings.ai_model,
+        base_url=settings.openai_base_url,
     )
     generator = IdeaGenerator(
         ai_client=ai_client,
