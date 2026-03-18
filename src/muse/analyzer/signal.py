@@ -29,7 +29,7 @@ class SignalDetector:
     exclude_areas: list[str]
     score_threshold: int
     indie_criteria: dict[str, Any]
-    batch_size: int = 15
+    batch_size: int = 50
 
     def _format_entries(self, entries: list[MinifluxEntry]) -> str:
         lines = []
