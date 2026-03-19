@@ -76,6 +76,14 @@ class AIClient:
                     last_error = AIRequestError(
                         f"AI API failed after {self.max_retries} retries: {e}"
                     )
+            except httpx.ReadTimeout:
+                logger.warning("ai_read_timeout", attempt=attempt + 1)
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.base_delay * (2**attempt))
+                else:
+                    last_error = AIRequestError(
+                        f"AI API read timeout after {self.max_retries} retries"
+                    )
 
         raise last_error  # type: ignore[misc]
 
@@ -87,7 +95,7 @@ class AIClient:
     async def _call_claude(
         self, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict]:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=180.0) as client:
             resp = await client.post(
                 CLAUDE_API_URL,
                 headers={
@@ -123,7 +131,7 @@ class AIClient:
             if self.base_url
             else f"{DEFAULT_OPENAI_BASE_URL}/chat/completions"
         )
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=180.0) as client:
             resp = await client.post(
                 url,
                 headers={

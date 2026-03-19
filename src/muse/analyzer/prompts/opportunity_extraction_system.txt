@@ -16,7 +16,7 @@ $focus_areas
 
 ## Output Format
 
-Respond with valid JSON only. No markdown, no explanation outside the JSON.
+You MUST respond with raw valid JSON only. Do NOT wrap it in markdown code blocks (no ```json or ```). No explanation outside the JSON.
 
 {
   "opportunities": [
