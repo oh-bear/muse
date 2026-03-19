@@ -95,7 +95,7 @@ class AIClient:
     async def _call_claude(
         self, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict]:
-        async with httpx.AsyncClient(timeout=180.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             resp = await client.post(
                 CLAUDE_API_URL,
                 headers={
@@ -131,7 +131,7 @@ class AIClient:
             if self.base_url
             else f"{DEFAULT_OPENAI_BASE_URL}/chat/completions"
         )
-        async with httpx.AsyncClient(timeout=180.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             resp = await client.post(
                 url,
                 headers={
