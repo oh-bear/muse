@@ -100,50 +100,63 @@ async def collect_signals_job(
         score_threshold=focus.score_threshold,
         indie_criteria=focus.indie_criteria,
     )
-    result = await detector.detect(filtered)
+    # 5. Detect signals and persist per batch
+    entry_map = {e.entry_id: e for e in entries}
+    all_signals: list[dict] = []
+    failed_batches = 0
+    total_batches = 0
 
-    # 5. Alert if majority of batches failed
-    if result.total_batches > 0 and result.failed_batches / result.total_batches > 0.5:
+    async for batch_result in detector.detect_batches(filtered):
+        total_batches = batch_result.total_batches
+
+        if batch_result.failed:
+            failed_batches += 1
+            continue
+
+        # Persist this batch immediately
+        async with session_factory() as session:
+            for s in batch_result.signals:
+                entry = entry_map.get(s["entry_id"])
+                if not entry:
+                    continue
+                # Dedup check
+                exists = await session.execute(
+                    select(Signal.id).where(Signal.miniflux_entry_id == s["entry_id"])
+                )
+                if exists.scalar_one_or_none():
+                    continue
+
+                session.add(
+                    Signal(
+                        miniflux_entry_id=s["entry_id"],
+                        title=entry.title,
+                        url=entry.url,
+                        source=entry.source,
+                        raw_summary=entry.content[:2000],
+                        ai_summary=s.get("summary", ""),
+                        ai_tags=s.get("tags", []),
+                        ai_score=s.get("score", 0),
+                        ai_reason=s.get("reason", ""),
+                    )
+                )
+            await session.commit()
+
+        all_signals.extend(batch_result.signals)
+
+    # 6. Alert if majority of batches failed
+    if total_batches > 0 and failed_batches / total_batches > 0.5:
         await telegram.send_alert(
-            f"Signal detection: {result.failed_batches}/{result.total_batches} batches failed"
+            f"Signal detection: {failed_batches}/{total_batches} batches failed"
         )
 
-    # 6. Store signals
-    entry_map = {e.entry_id: e for e in entries}
+    # 7. Update watermark (once, after all batches)
     async with session_factory() as session:
-        for s in result.signals:
-            entry = entry_map.get(s["entry_id"])
-            if not entry:
-                continue
-            # Dedup check
-            exists = await session.execute(
-                select(Signal.id).where(Signal.miniflux_entry_id == s["entry_id"])
-            )
-            if exists.scalar_one_or_none():
-                continue
-
-            session.add(
-                Signal(
-                    miniflux_entry_id=s["entry_id"],
-                    title=entry.title,
-                    url=entry.url,
-                    source=entry.source,
-                    raw_summary=entry.content[:2000],
-                    ai_summary=s.get("summary", ""),
-                    ai_tags=s.get("tags", []),
-                    ai_score=s.get("score", 0),
-                    ai_reason=s.get("reason", ""),
-                )
-            )
-
-        # Update watermark
         max_id = max(e.entry_id for e in entries)
         await _set_state(session, "last_processed_entry_id", str(max_id))
-        await session.commit()
 
-    # 7. Push to Telegram (chained — event-driven, not clock-driven)
+    # 8. Push to Telegram (chained — event-driven, not clock-driven)
     try:
-        await telegram.send_daily_summary(result.signals, total_processed=len(entries))
+        await telegram.send_daily_summary(all_signals, total_processed=len(entries))
     except Exception as e:
         logger.error("telegram_push_failed", error=str(e))
 
@@ -153,7 +166,7 @@ async def collect_signals_job(
         job_id=job_id,
         entries=len(entries),
         filtered=len(filtered),
-        signals=len(result.signals),
+        signals=len(all_signals),
     )
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from string import Template
@@ -14,8 +15,20 @@ logger = structlog.get_logger()
 
 
 @dataclass
-class DetectionResult:
+class BatchResult:
+    """Result of a single batch detection."""
+
     signals: list[dict[str, Any]] = field(default_factory=list)
+    failed: bool = False
+    batch_index: int = 0
+    total_batches: int = 0
+
+
+@dataclass
+class DetectionSummary:
+    """Aggregated summary after all batches are processed."""
+
+    total_signals: int = 0
     failed_batches: int = 0
     total_batches: int = 0
 
@@ -56,45 +69,41 @@ class SignalDetector:
         )
         return system_prompt, user_prompt
 
-    async def detect(self, entries: list[MinifluxEntry]) -> DetectionResult:
-        result = DetectionResult()
+    async def detect_batches(
+        self, entries: list[MinifluxEntry]
+    ) -> AsyncIterator[BatchResult]:
+        """Yield signals batch by batch for incremental DB persistence."""
         batches = [
             entries[i : i + self.batch_size]
             for i in range(0, len(entries), self.batch_size)
         ]
-        result.total_batches = len(batches)
+        total = len(batches)
 
         for batch_idx, batch in enumerate(batches):
+            batch_result = BatchResult(
+                batch_index=batch_idx, total_batches=total
+            )
             try:
                 system_prompt, user_prompt = self._build_prompts(batch)
                 ai_result, usage = await self.ai_client.call(system_prompt, user_prompt)
 
                 for entry_result in ai_result.get("entries", []):
                     if entry_result.get("score", 0) >= self.score_threshold:
-                        result.signals.append(entry_result)
+                        batch_result.signals.append(entry_result)
 
                 logger.info(
                     "signal_batch_processed",
                     batch=batch_idx + 1,
-                    total_batches=len(batches),
+                    total_batches=total,
+                    signals=len(batch_result.signals),
                     input_tokens=usage.get("input_tokens"),
                     output_tokens=usage.get("output_tokens"),
                 )
 
             except AIRequestError as e:
-                result.failed_batches += 1
-                logger.error("signal_batch_failed", batch=batch_idx + 1, error=str(e))
+                batch_result.failed = True
+                logger.error(
+                    "signal_batch_failed", batch=batch_idx + 1, error=str(e)
+                )
 
-        if batches and result.failed_batches / len(batches) > 0.5:
-            logger.critical(
-                "majority_batches_failed",
-                failed=result.failed_batches,
-                total=len(batches),
-            )
-
-        logger.info(
-            "signal_detection_complete",
-            total_entries=len(entries),
-            signals=len(result.signals),
-        )
-        return result
+            yield batch_result

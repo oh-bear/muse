@@ -38,6 +38,20 @@ def detector(tmp_path):
     )
 
 
+async def _collect_batches(detector, entries):
+    """Helper: consume detect_batches and aggregate results."""
+    all_signals = []
+    failed = 0
+    total = 0
+    async for batch in detector.detect_batches(entries):
+        total = batch.total_batches
+        if batch.failed:
+            failed += 1
+        else:
+            all_signals.extend(batch.signals)
+    return all_signals, failed, total
+
+
 @pytest.mark.asyncio
 async def test_detect_returns_high_scoring_entries(detector):
     ai_response = {
@@ -64,11 +78,11 @@ async def test_detect_returns_high_scoring_entries(detector):
     )
 
     entries = [_entry(1, "AI Tool"), _entry(2, "Meh Tool")]
-    result = await detector.detect(entries)
+    signals, failed, total = await _collect_batches(detector, entries)
 
-    assert len(result.signals) == 1
-    assert result.signals[0]["entry_id"] == 1
-    assert result.signals[0]["score"] == 4
+    assert len(signals) == 1
+    assert signals[0]["entry_id"] == 1
+    assert signals[0]["score"] == 4
 
 
 @pytest.mark.asyncio
@@ -113,9 +127,9 @@ async def test_detect_batches_entries(detector):
     ]
 
     entries = [_entry(i, f"Tool {i}") for i in range(1, 4)]
-    result = await detector.detect(entries)
+    signals, failed, total = await _collect_batches(detector, entries)
 
-    assert len(result.signals) == 3
+    assert len(signals) == 3
     assert detector.ai_client.call.call_count == 2
 
 
@@ -143,8 +157,8 @@ async def test_detect_tracks_failed_batches(detector):
     ]
 
     entries = [_entry(i, f"Tool {i}") for i in range(1, 4)]
-    result = await detector.detect(entries)
+    signals, failed, total = await _collect_batches(detector, entries)
 
-    assert result.failed_batches == 1
-    assert result.total_batches == 2
-    assert len(result.signals) == 1
+    assert failed == 1
+    assert total == 2
+    assert len(signals) == 1
